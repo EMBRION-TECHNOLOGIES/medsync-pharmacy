@@ -36,6 +36,13 @@ export default function OrdersPage() {
         page,
         limit: pageSize,
       });
+      
+      // DEBUG: Log the orders to see patient data
+      console.log('🔍 Orders loaded:', res.data);
+      if (res.data && res.data.length > 0) {
+        console.log('🔍 First order patient data:', res.data[0].patientMsid, res.data[0]);
+      }
+      
       setOrders(res.data);
       setTotal(res.total);
     } finally {

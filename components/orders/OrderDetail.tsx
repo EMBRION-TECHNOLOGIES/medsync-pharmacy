@@ -34,7 +34,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
 
   if (!order) return null;
 
-  const canDispense = order.status === 'confirmed';
+  const canDispense = order.status?.toLowerCase() === 'confirmed';
 
   const handleDispense = () => {
     const items = order.items.map((item) => ({
@@ -123,7 +123,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
 
           {/* Actions */}
           <div className="flex gap-2 justify-end">
-            {order.status === 'pending' && (
+            {order.status?.toLowerCase() === 'pending' && (
               <div className="text-sm text-muted-foreground">
                 ⏳ Waiting for patient to confirm order in their mobile app
               </div>
@@ -135,20 +135,25 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
                 className="ms-gradient"
               >
                 <Package className="h-4 w-4 mr-2" />
-                Mark as Dispensed
+                Mark as Prepared
               </Button>
             )}
-            {order.status === 'dispensed' && (
+            {order.status?.toLowerCase() === 'prepared' && (
               <div className="text-sm text-muted-foreground">
-                ⏳ Waiting for patient payment (will auto-trigger dispatch)
+                ✨ Order ready on counter — waiting for patient payment (will auto-trigger dispatch)
               </div>
             )}
-            {order.status === 'out_for_delivery' && (
+            {order.status?.toLowerCase() === 'dispensed' && (
+              <div className="text-sm text-muted-foreground">
+                💊 Dispensed — courier has picked up
+              </div>
+            )}
+            {order.status?.toLowerCase() === 'out_for_delivery' && (
               <div className="text-sm text-muted-foreground">
                 🚚 Order is out for delivery
               </div>
             )}
-            {order.status === 'delivered' && (
+            {order.status?.toLowerCase() === 'delivered' && (
               <div className="text-sm text-green-600">
                 ✅ Order delivered successfully
               </div>

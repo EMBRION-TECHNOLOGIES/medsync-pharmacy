@@ -28,8 +28,9 @@ export class SocketService {
     this.handlers = handlers;
 
     // Build socket URL with namespace
-    const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://192.168.1.227:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000';
     const socketUrl = `${baseUrl}${NAMESPACE}`;
+    console.log('🔌 Connecting to Socket.IO:', socketUrl);
 
     this.socket = io(socketUrl, {
       transports: ['websocket'],

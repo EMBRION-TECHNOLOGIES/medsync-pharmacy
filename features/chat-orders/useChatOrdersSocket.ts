@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { SocketService } from '@/lib/socketService';
+import { socketService } from '@/lib/socketService';
 import { useAuth } from '@/features/auth/hooks';
 import { useOrg } from '@/store/useOrg';
 import { chatOrdersService } from './service';
@@ -10,7 +10,8 @@ export function useChatOrdersSocket() {
   const { user } = useAuth();
   const { pharmacyId } = useOrg();
 
-  const socket = useMemo(() => new SocketService(), []);
+  // Use singleton socket service instead of creating new instances
+  const socket = socketService;
 
   useEffect(() => {
     if (!user?.pharmacyId) return;
@@ -198,13 +199,30 @@ export function useChatRoomSocket(roomId?: string) {
       return;
     }
 
-    // Note: Room is already joined when socket connects (auto-join all rooms)
-    // This hook just ensures we're in the room if it was created after connect
-    console.log('✅ Chat room ready:', roomId);
+    let retryTimer: NodeJS.Timeout | null = null;
+
+    // Wait for socket to be connected before joining
+    if (socket.isConnected()) {
+      console.log('🔵 Joining chat room:', roomId);
+      socket.joinChat(roomId);
+    } else {
+      console.log('⏳ Socket not connected yet, waiting...');
+      // Retry after a short delay
+      retryTimer = setTimeout(() => {
+        if (socket.isConnected()) {
+          console.log('🔵 Joining chat room (retry):', roomId);
+          socket.joinChat(roomId);
+        } else {
+          console.error('❌ Socket still not connected after retry');
+        }
+      }, 1000);
+    }
     
-    // No-op cleanup (rooms are already managed by auto-join)
+    // Leave room on cleanup
     return () => {
-      // Don't leave on cleanup - we want to stay in all rooms
+      if (retryTimer) clearTimeout(retryTimer);
+      console.log('🔴 Leaving chat room:', roomId);
+      socket.leaveChat(roomId);
     };
   }, [roomId, socket]);
 

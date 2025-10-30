@@ -226,7 +226,34 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate max-w-[300px]">
-                        {thread.lastMessage?.content || 'No messages yet'}
+                        {(() => {
+                          const content = thread.lastMessage?.content;
+                          if (!content) return 'No messages yet';
+                          
+                          // Parse ORDER_STATUS messages for human-readable preview
+                          if (content.includes('[ORDER_STATUS]')) {
+                            try {
+                              const orderData = JSON.parse(content.replace('[ORDER_STATUS]', ''));
+                              const status = (orderData.status || '').toLowerCase();
+                              const statusText = 
+                                status === 'pending' ? 'Pending order' :
+                                status === 'confirmed' ? 'Confirmed' :
+                                status === 'preparing' ? 'Preparing' :
+                                status === 'prepared' ? 'Ready on counter' :
+                                status === 'out_for_delivery' ? 'Out for delivery' :
+                                status === 'dispensed' ? 'Dispensed' :
+                                status === 'delivered' ? 'Delivered' :
+                                'Order update';
+                              
+                              return `${statusText} • ${orderData.orderCode}`;
+                            } catch {
+                              return 'Order status update';
+                            }
+                          }
+                          
+                          // Regular message
+                          return content;
+                        })()}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(thread.updatedAt).toLocaleTimeString()}

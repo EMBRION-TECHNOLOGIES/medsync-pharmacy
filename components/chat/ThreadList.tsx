@@ -53,7 +53,33 @@ export function ThreadList({ threads, selectedThreadId, onSelectThread }: Thread
               {thread.lastMessage && (
                 <>
                   <p className="text-sm text-muted-foreground truncate mb-1">
-                    {thread.lastMessage.content}
+                    {(() => {
+                      const content = thread.lastMessage.content;
+                      
+                      // Parse ORDER_STATUS messages for human-readable preview
+                      if (content.includes('[ORDER_STATUS]')) {
+                        try {
+                          const orderData = JSON.parse(content.replace('[ORDER_STATUS]', ''));
+                          const status = (orderData.status || '').toLowerCase();
+                          const statusText = 
+                            status === 'pending' ? 'Pending order' :
+                            status === 'confirmed' ? 'Confirmed order' :
+                            status === 'preparing' ? 'Preparing' :
+                            status === 'prepared' ? 'Ready on counter' :
+                            status === 'out_for_delivery' ? 'Out for delivery' :
+                            status === 'dispensed' ? 'Dispensed' :
+                            status === 'delivered' ? 'Delivered' :
+                            'Order update';
+                          
+                          return `${statusText} • ${orderData.orderCode}`;
+                        } catch {
+                          return 'Order status update';
+                        }
+                      }
+                      
+                      // Regular message
+                      return content;
+                    })()}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(thread.lastMessage.createdAt), 'MMM dd, HH:mm')}

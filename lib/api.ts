@@ -59,8 +59,16 @@ api.interceptors.response.use(
     // Unwrap API response format: { success, data, message, timestamp, correlationId }
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       if (response.data.success) {
-        // Return unwrapped data for successful responses
-        return { ...response, data: response.data.data };
+        // Check if response has pagination metadata
+        const hasPagination = 'page' in response.data || 'pageSize' in response.data || 'total' in response.data;
+        
+        if (hasPagination) {
+          // Return the whole response.data object to preserve pagination
+          return { ...response, data: response.data };
+        } else {
+          // Return unwrapped data for non-paginated responses
+          return { ...response, data: response.data.data };
+        }
       } else {
         // For failed API responses, return the response as is
         // Let the calling function handle the error

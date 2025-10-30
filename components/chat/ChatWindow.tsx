@@ -102,29 +102,98 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
 
     // Check if message is an order status update
     if (message.content.includes('[ORDER_STATUS]')) {
-      const orderData = JSON.parse(message.content.replace('[ORDER_STATUS]', ''));
-      return (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Package className="h-4 w-4" />
-            <span>Order Update</span>
-          </div>
-          <div className="bg-muted/50 p-3 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Order #{orderData.orderId}</span>
-              <Badge variant={orderData.status === 'paid' ? 'default' : 'secondary'}>
-                {orderData.status}
-              </Badge>
-            </div>
-            {orderData.status === 'paid' && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-ms-green">
-                <CirclePoundSterling className="h-4 w-4" />
-                <span>Payment received - Ready to pack</span>
+      try {
+        const orderData = JSON.parse(message.content.replace('[ORDER_STATUS]', ''));
+        const status = (orderData.status || '').toLowerCase();
+        
+        // Simple, clean status configuration
+        const statusConfig = {
+          pending: {
+            icon: '⏳',
+            label: 'Awaiting Patient Confirmation',
+            bgColor: 'bg-amber-100 dark:bg-amber-900/40',
+            textColor: 'text-amber-900 dark:text-amber-100',
+            accentColor: 'text-amber-700 dark:text-amber-300'
+          },
+          confirmed: {
+            icon: '✅',
+            label: 'Confirmed — Pharmacy Preparing',
+            bgColor: 'bg-green-100 dark:bg-green-900/40',
+            textColor: 'text-green-900 dark:text-green-100',
+            accentColor: 'text-green-700 dark:text-green-300'
+          },
+          preparing: {
+            icon: '📦',
+            label: 'Preparing Medication',
+            bgColor: 'bg-blue-100 dark:bg-blue-900/40',
+            textColor: 'text-blue-900 dark:text-blue-100',
+            accentColor: 'text-blue-700 dark:text-blue-300'
+          },
+          prepared: {
+            icon: '✨',
+            label: 'Prepared — Ready on Counter',
+            bgColor: 'bg-purple-100 dark:bg-purple-900/40',
+            textColor: 'text-purple-900 dark:text-purple-100',
+            accentColor: 'text-purple-700 dark:text-purple-300'
+          },
+          out_for_delivery: {
+            icon: '🚚',
+            label: 'Courier Booked — On the Way',
+            bgColor: 'bg-cyan-100 dark:bg-cyan-900/40',
+            textColor: 'text-cyan-900 dark:text-cyan-100',
+            accentColor: 'text-cyan-700 dark:text-cyan-300'
+          },
+          dispensed: {
+            icon: '💊',
+            label: 'Dispensed — Courier Has It',
+            bgColor: 'bg-indigo-100 dark:bg-indigo-900/40',
+            textColor: 'text-indigo-900 dark:text-indigo-100',
+            accentColor: 'text-indigo-700 dark:text-indigo-300'
+          },
+          delivered: {
+            icon: '🎉',
+            label: 'Delivered Successfully',
+            bgColor: 'bg-emerald-100 dark:bg-emerald-900/40',
+            textColor: 'text-emerald-900 dark:text-emerald-100',
+            accentColor: 'text-emerald-700 dark:text-emerald-300'
+          }
+        };
+        
+        const config = statusConfig[status as keyof typeof statusConfig] || {
+          icon: '📋',
+          label: 'Order Updated',
+          bgColor: 'bg-gray-100 dark:bg-gray-900/40',
+          textColor: 'text-gray-900 dark:text-gray-100',
+          accentColor: 'text-gray-700 dark:text-gray-300'
+        };
+        
+        return (
+          <div className="w-full max-w-sm">
+            <div className={cn("rounded-lg p-4 space-y-2.5", config.bgColor, config.textColor)}>
+              {/* Header with icon and status */}
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{config.icon}</span>
+                <span className="font-semibold">{config.label}</span>
               </div>
-            )}
+              
+              {/* Order Code - simple and readable */}
+              <div className={cn("font-mono text-sm font-medium", config.accentColor)}>
+                {orderData.orderCode}
+              </div>
+              
+              {/* View Details Link */}
+              <button 
+                onClick={() => window.location.href = `/orders/${orderData.orderId}`}
+                className={cn("text-sm font-medium hover:underline", config.accentColor)}
+              >
+                View Full Details →
+              </button>
+            </div>
           </div>
-        </div>
-      );
+        );
+      } catch (e) {
+        return <p className="text-sm text-muted-foreground">Order status update</p>;
+      }
     }
 
     // Regular text message

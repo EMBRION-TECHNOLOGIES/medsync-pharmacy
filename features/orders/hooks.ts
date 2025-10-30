@@ -46,8 +46,8 @@ export const useUpdateOrderStatus = () => {
       queryClient.setQueryData(['order', data.id], data);
       toast.success(`Order ${data.status.toLowerCase()} successfully`);
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update order status');
+    onError: (error) => {
+      toast.error((error as Error).message || 'Failed to update order status');
     },
   });
 };
@@ -61,10 +61,10 @@ export const useDispenseOrder = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.setQueryData(['order', data.id], data);
-      toast.success('Order dispensed successfully');
+      toast.success('Order marked as prepared and ready for pickup');
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to dispense order');
+    onError: (error) => {
+      toast.error((error as Error).message || 'Failed to mark order as prepared');
     },
   });
 };
@@ -80,8 +80,8 @@ export const useCancelOrder = () => {
       queryClient.setQueryData(['order', data.id], data);
       toast.success('Order cancelled successfully');
     },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Failed to cancel order');
+    onError: (error) => {
+      toast.error((error as Error).message || 'Failed to cancel order');
     },
   });
 };

@@ -100,7 +100,7 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
         {/* Thread List */}
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -128,7 +128,7 @@ export default function ChatPage() {
               <MessageSquare className="h-5 w-5" />
               {selectedThread ? (
                 <span className="font-mono text-sm">
-                  {selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.name || 'Unknown Patient'}
+                  {selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.name ?? 'Unknown Patient'}
                 </span>
               ) : (
                 'Select a conversation'
@@ -140,15 +140,15 @@ export default function ChatPage() {
               <>
                 <ChatWindow 
                   messages={messages?.messages || []} 
-                  patientAlias={selectedThread?.participants.find(p => p.type === 'patient')?.id || 'Unknown'}
-                  threadId={selectedThread?.id}
-                  patientId={selectedThread?.participants.find(p => p.type === 'patient')?.id || 'Unknown'}
+                  patientAlias={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
+                  threadId={selectedThread.id}
+                  patientId={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
         />
                 <MessageInput
                   onSend={handleSendMessage}
                   disabled={sendMessage.isPending}
                   onQuickAction={handleQuickAction}
-                  roomId={selectedThread?.id}
+                  roomId={selectedThread.id}
                   onTyping={handleTyping}
                   onOrderCreated={handleOrderCreated}
                 />
