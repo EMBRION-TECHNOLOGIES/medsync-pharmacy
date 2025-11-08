@@ -308,11 +308,26 @@ export default function SignupPage() {
           await pharmacyService.createPharmacy(pharmacyData);
           toast.success('Registration successful! You can now login with your credentials.');
           router.push('/login');
-        } catch (pharmacyError) {
+        } catch (pharmacyError: any) {
           console.error('Pharmacy creation failed:', pharmacyError);
+          
+          // Handle 409 Conflict - user already has a pharmacy
+          if (pharmacyError?.response?.status === 409) {
+            const errorMessage = pharmacyError?.response?.data?.error?.message || 
+                                pharmacyError?.response?.data?.message ||
+                                'You already have a pharmacy registered. Please login instead.';
+            toast.error(errorMessage);
+            // Redirect to login since they already have an account
+            setTimeout(() => router.push('/login'), 2000);
+            return;
+          }
+          
           // If pharmacy creation fails, we should ideally rollback user registration
           // For now, show error and let user try again
-          toast.error('User account created but pharmacy registration failed. Please contact support.');
+          const errorMessage = pharmacyError?.response?.data?.error?.message || 
+                              pharmacyError?.response?.data?.message ||
+                              'User account created but pharmacy registration failed. Please contact support.';
+          toast.error(errorMessage);
           // Don't redirect to login - let user try again
         }
       }
