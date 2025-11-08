@@ -110,7 +110,7 @@ export function OrdersTable({ orders, onViewOrder }: OrdersTableProps) {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="max-w-xs truncate" title={itemsDisplay}>
-                        {itemsDisplay}
+                    {itemsDisplay}
                       </span>
                       {order.items && Array.isArray(order.items) && order.items.length > 0 && (
                         <Button 
