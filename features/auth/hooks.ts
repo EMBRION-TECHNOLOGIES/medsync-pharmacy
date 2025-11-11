@@ -20,7 +20,7 @@ export const useAuth = () => {
       }).then((result) => {
         // ✅ VALIDATE ROLE ON STARTUP
         if (result?.data) {
-          const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER'];
+        const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER', 'ADMIN'];
           
           if (!allowedRoles.includes(result.data.role)) {
             console.warn('⚠️ Non-pharmacy user detected, logging out:', result.data.role);
@@ -40,7 +40,9 @@ export const useAuth = () => {
     queryKey: ['auth', 'me'],
     queryFn: authService.getMe,
     retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // Always fetch fresh data to get latest verification status
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
     enabled: authService.isAuthenticated() && isInitialized,
     onError: (error) => {
       console.error('❌ Auth error - likely backend issue:', error);
@@ -69,11 +71,11 @@ export const useLogin = () => {
 
   return useMutation({
     mutationFn: (credentials: LoginInput) => authService.login(credentials),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const userRole = data.user.role;
       
       // ✅ ENFORCE PHARMACY PORTAL ACCESS
-      const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER'];
+      const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER', 'ADMIN'];
       
       if (!allowedRoles.includes(userRole)) {
         // BLOCK non-pharmacy users
@@ -89,9 +91,32 @@ export const useLogin = () => {
         throw new Error(errorMessage);
       }
       
-      // User has correct role, proceed with login
+      // Set initial user data from login response
       queryClient.setQueryData(['auth', 'me'], data.user);
-      router.push('/dashboard');
+      
+      // CRITICAL: Immediately refetch fresh user data to get latest verification status
+      // This ensures we have the most up-to-date verification status after login
+      try {
+        const freshUserData = await queryClient.fetchQuery({
+          queryKey: ['auth', 'me'],
+          queryFn: authService.getMe,
+          staleTime: 0, // Force fresh fetch
+        });
+        
+        // Update cache with fresh data (includes latest verification status)
+        queryClient.setQueryData(['auth', 'me'], freshUserData);
+        
+        console.log('✅ Fresh user data fetched after login:', freshUserData);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch fresh user data after login, using login response data:', error);
+        // Continue with login response data if refetch fails
+      }
+
+      if (userRole === 'ADMIN') {
+        router.push('/admin/verification');
+      } else {
+        router.push('/dashboard');
+      }
     },
     onError: (error) => {
       console.error('Login error:', error);

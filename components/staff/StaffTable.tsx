@@ -77,33 +77,37 @@ export function StaffTable({ staff }: StaffTableProps) {
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Location</TableHead>
             <TableHead>Joined</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {allStaff.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                 No staff members found
               </TableCell>
             </TableRow>
           ) : (
-            allStaff.map((member) => (
+            allStaff.map((member: any) => (
               <TableRow key={member.id}>
                 <TableCell className="font-medium">
-                  {member.name}
+                  {member.name || `${member.user?.firstName || ''} ${member.user?.lastName || ''}`.trim() || member.email}
                   {member.id === user?.id && (
                     <span className="ml-2 text-xs text-muted-foreground">(You)</span>
                   )}
                 </TableCell>
-                <TableCell>{member.email}</TableCell>
+                <TableCell>{member.email || member.user?.email}</TableCell>
                 <TableCell>
                   <Badge className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}>
                     {roleLabels[member.role as keyof typeof roleLabels] || member.role}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {format(new Date(member.createdAt), 'MMM dd, yyyy')}
+                  {member.location?.name || <span className="text-muted-foreground">All Locations</span>}
+                </TableCell>
+                <TableCell>
+                  {format(new Date(member.createdAt || member.acceptedAt || new Date()), 'MMM dd, yyyy')}
                 </TableCell>
               </TableRow>
             ))

@@ -1,63 +1,119 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { socketService } from '@/lib/socketService';
+import { useAuth } from '@/features/auth/hooks';
+import { useOrg } from '@/store/useOrg';
 
 interface ConnectionStatusProps {
   className?: string;
 }
 
 export function ConnectionStatus({ className }: ConnectionStatusProps) {
+  const { user } = useAuth();
+  const { pharmacyId } = useOrg();
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
+  // Only show connection status for pharmacy roles
+  const isPharmacyRole = user?.role === 'PHARMACY_OWNER' || user?.role === 'PHARMACIST';
+  const shouldShow = isPharmacyRole && !!pharmacyId;
+
   useEffect(() => {
-    // Check initial connection status
-    setIsConnected(socketService.isConnected());
-
-    // Listen for connection changes
-    const handleConnect = () => {
-      setIsConnected(true);
-      setIsReconnecting(false);
-    };
-
-    const handleDisconnect = () => {
+    if (!shouldShow) {
+      // Don't track connection for admins or users without pharmacyId
       setIsConnected(false);
-      setIsReconnecting(true);
-    };
+      return;
+    }
 
-    // Set up socket event listeners
-    socketService.connect(() => {
-      return typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    }, {
-      onConnect: handleConnect,
-      onDisconnect: handleDisconnect,
-    });
+    // Check initial connection status
+    const checkConnection = () => {
+      const connected = socketService.isConnected();
+      setIsConnected(connected);
+      if (!connected && isReconnecting) {
+        setIsReconnecting(false);
+      }
+    };
+    
+    checkConnection();
+
+    // Poll connection status periodically to catch state changes
+    // This is needed because the hook manages the connection, not this component
+    const interval = setInterval(checkConnection, 2000);
+
+    // Also listen to socket events directly if socket exists
+    const socket = socketService.getSocket();
+    if (socket) {
+      const handleConnect = () => {
+        console.log('🔌 ConnectionStatus: Socket connected');
+        setIsConnected(true);
+        setIsReconnecting(false);
+      };
+
+      const handleDisconnect = () => {
+        console.log('🔌 ConnectionStatus: Socket disconnected');
+        setIsConnected(false);
+        setIsReconnecting(false);
+      };
+
+      socket.on('connect', handleConnect);
+      socket.on('disconnect', handleDisconnect);
+
+      return () => {
+        clearInterval(interval);
+        socket.off('connect', handleConnect);
+        socket.off('disconnect', handleDisconnect);
+      };
+    }
 
     return () => {
-      // Cleanup is handled by the socket service
+      clearInterval(interval);
     };
-  }, []);
+  }, [shouldShow, isReconnecting]);
 
-  const handleReconnect = () => {
+  const handleReconnect = useCallback(() => {
+    if (!shouldShow || !pharmacyId) return;
+    
+    console.log('🔄 Retry button clicked - forcing reconnection');
     setIsReconnecting(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (token) {
-      socketService.connect(() => token, {
-        onConnect: () => {
-          setIsConnected(true);
-          setIsReconnecting(false);
-        },
-        onDisconnect: () => {
-          setIsConnected(false);
-          setIsReconnecting(false);
-        },
-      });
-    }
-  };
+    
+    // Force disconnect first
+    socketService.disconnect();
+    
+    // Wait a bit then reconnect
+    setTimeout(() => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (token && pharmacyId) {
+        console.log('🔄 Attempting to reconnect socket...');
+        // Force reconnect by passing true as third parameter
+        (socketService as any).connect(() => token, {
+          onConnect: () => {
+            console.log('✅ Reconnection successful');
+            setIsConnected(true);
+            setIsReconnecting(false);
+            // Join pharmacy room after connection
+            socketService.joinPharmacy(pharmacyId);
+          },
+          onDisconnect: () => {
+            console.log('❌ Reconnection failed - disconnected');
+            setIsConnected(false);
+            setIsReconnecting(false);
+          },
+        }, true); // Force reconnect
+      } else {
+        console.warn('⚠️ Cannot reconnect - missing token or pharmacyId');
+        setIsReconnecting(false);
+      }
+    }, 500);
+  }, [shouldShow, pharmacyId]);
+
+  // Don't show connection status for admins or users without pharmacy
+  if (!shouldShow) {
+    return null;
+  }
 
   if (isConnected) {
     return (

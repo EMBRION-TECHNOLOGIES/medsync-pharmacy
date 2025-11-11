@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, MapPin, Navigation, Shield, AlertCircle } from 'lucide-react';
@@ -12,12 +12,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 type PharmacyRegistrationForm = PharmacyRegistrationInput;
+
+type ApiErrorResponse = {
+  response?: {
+    status?: number;
+    data?: {
+      error?: { message?: string };
+      message?: string;
+    };
+  };
+};
 
 export default function SignupPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -30,13 +41,13 @@ export default function SignupPage() {
   const [resolvedAddress, setResolvedAddress] = useState<string>('');
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   // Only pharmacy owners can register a pharmacy
-  const selectedRole: 'PHARMACY_OWNER' = 'PHARMACY_OWNER';
+  const selectedRole = 'PHARMACY_OWNER' as const;
   const register = useRegister();
   const router = useRouter();
+  const verificationEmail = 'admin@medsync.ng';
   
   const {
     register: registerField,
-    handleSubmit,
     formState: { errors },
     watch,
     setValue,
@@ -95,9 +106,9 @@ export default function SignupPage() {
       } else {
         toast.error('Could not find coordinates for this address');
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Error converting address to coordinates');
-      console.error('Geocoding error:', error);
+      console.error('Geocoding error:', _error);
     } finally {
       setIsGeocoding(false);
     }
@@ -131,7 +142,7 @@ export default function SignupPage() {
         setLicenseValidationStatus('invalid');
         toast.error('Invalid license number format');
       }
-    } catch (error) {
+    } catch {
       setLicenseValidationStatus('invalid');
       toast.error('License verification failed. Please try again.');
     } finally {
@@ -140,20 +151,20 @@ export default function SignupPage() {
   };
 
   // Reverse geocoding function to get address from coordinates
-  const reverseGeocode = async (latitude: number, longitude: number) => {
+  const reverseGeocode = async (latitude: number, longitude: number): Promise<string | null> => {
     setIsReverseGeocoding(true);
     
     // Set a timeout to prevent infinite loading
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise: Promise<never> = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Timeout')), 5000); // 5 second timeout
     });
     
     try {
-      const geocodingPromise = fetch(
+      const geocodingPromise: Promise<{ display_name?: string }> = fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=16`
-      ).then(response => response.json());
+      ).then(async (response) => (await response.json()) as { display_name?: string });
       
-      const data = await Promise.race([geocodingPromise, timeoutPromise]) as any;
+      const data = await Promise.race([geocodingPromise, timeoutPromise]);
       
       if (data && data.display_name) {
         // Format the address nicely - take first few parts for brevity
@@ -163,8 +174,8 @@ export default function SignupPage() {
         return shortAddress;
       }
       return null;
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
+    } catch (_error) {
+      console.error('Reverse geocoding error:', _error);
       // Fallback: create a simple address from coordinates
       const fallbackAddress = `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
       setResolvedAddress(fallbackAddress);
@@ -180,12 +191,12 @@ export default function SignupPage() {
     setValue('longitude', longitude);
     
     // Start reverse geocoding in the background (non-blocking)
-    reverseGeocode(latitude, longitude).then((address) => {
+    reverseGeocode(latitude, longitude).then((address: string | null) => {
       if (address) {
         setValue('address', address);
         setResolvedAddress(address);
       }
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       console.error('Background reverse geocoding failed:', error);
     });
   };
@@ -272,9 +283,10 @@ export default function SignupPage() {
         
         try {
           await pharmacyService.createPharmacy(pharmacyData);
-          toast.success('Pharmacy registration completed! You can now access the full system.');
+          toast.success('Pharmacy registration submitted for review.');
+          toast.info(`Email your pharmacy license and government-issued ID to ${verificationEmail} so we can verify your account.`);
           router.push('/dashboard');
-        } catch (pharmacyError) {
+        } catch (pharmacyError: unknown) {
           console.error('Pharmacy creation failed:', pharmacyError);
           toast.error('Pharmacy registration failed. Please try again.');
         }
@@ -290,7 +302,7 @@ export default function SignupPage() {
         };
 
         // Register the user account
-        const result = await register.mutateAsync(userData);
+        await register.mutateAsync(userData);
         
         // After user registration, create the pharmacy
         const pharmacyData = {
@@ -306,15 +318,17 @@ export default function SignupPage() {
         
         try {
           await pharmacyService.createPharmacy(pharmacyData);
-          toast.success('Registration successful! You can now login with your credentials.');
+          toast.success('Registration received! We will review your documents shortly.');
+          toast.info(`Next step: email your pharmacy license and valid ID to ${verificationEmail}. We will notify you once verification is complete.`);
           router.push('/login');
-        } catch (pharmacyError: any) {
+        } catch (pharmacyError: unknown) {
           console.error('Pharmacy creation failed:', pharmacyError);
           
           // Handle 409 Conflict - user already has a pharmacy
-          if (pharmacyError?.response?.status === 409) {
-            const errorMessage = pharmacyError?.response?.data?.error?.message || 
-                                pharmacyError?.response?.data?.message ||
+          const response = (pharmacyError as ApiErrorResponse).response;
+          if (response?.status === 409) {
+            const errorMessage = response?.data?.error?.message || 
+                                response?.data?.message ||
                                 'You already have a pharmacy registered. Please login instead.';
             toast.error(errorMessage);
             // Redirect to login since they already have an account
@@ -324,15 +338,16 @@ export default function SignupPage() {
           
           // If pharmacy creation fails, we should ideally rollback user registration
           // For now, show error and let user try again
-          const errorMessage = pharmacyError?.response?.data?.error?.message || 
-                              pharmacyError?.response?.data?.message ||
+          const fallbackMessage = response?.data?.error?.message || response?.data?.message;
+          const errorMessage =
+            fallbackMessage ||
                               'User account created but pharmacy registration failed. Please contact support.';
           toast.error(errorMessage);
           // Don't redirect to login - let user try again
         }
       }
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Registration failed:', error);
       toast.error('Registration failed. Please try again.');
     } finally {
@@ -395,7 +410,6 @@ export default function SignupPage() {
               onSubmitStep2();
             } else {
               // For step 3, we need to get the form data and call onSubmitStep3 directly
-              const formData = new FormData(e.currentTarget);
               const data: PharmacyRegistrationForm = {
                 role: selectedRole,
                 firstName: watch('firstName'),
@@ -691,10 +705,10 @@ export default function SignupPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-2">Review Your Registration</h3>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-semibold">Review & Submit</h3>
                   <p className="text-sm text-muted-foreground">
-                    Please review your information before completing registration
+                    Confirm your details, then send your documents for manual verification.
                   </p>
                 </div>
 
@@ -719,10 +733,25 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>After registration, you will be able to login and access the pharmacy dashboard.</p>
-                  <p>As a pharmacy owner, you can manage staff, locations, and all pharmacy operations.</p>
-                </div>
+                <Alert className="border-amber-300 bg-amber-50 text-amber-900">
+                  <AlertTitle>Manual Verification Required</AlertTitle>
+                  <AlertDescription className="space-y-2">
+                    <p>
+                      To activate dispensing access, email the following documents to{' '}
+                      <a className="underline font-medium" href={`mailto:${verificationEmail}`}>
+                        {verificationEmail}
+                      </a>:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                      <li>Pharmacy Council of Nigeria (PCN) license for your pharmacy</li>
+                      <li>Valid government-issued ID for the supervising pharmacist</li>
+                      <li>Registered email and phone number so we can match your application</li>
+                    </ul>
+                    <p className="text-sm">
+                      We&apos;ll confirm by email once your pharmacy is approved. Until then you can update settings and review onboarding resources inside the portal.
+                    </p>
+                  </AlertDescription>
+                </Alert>
               </div>
             )}
 

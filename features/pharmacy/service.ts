@@ -144,13 +144,17 @@ export const pharmacyService = {
     return response.data.activities;
   },
 
-  async inviteStaff(pharmacyId: string, data: { email: string; role: string }): Promise<any> {
+  async inviteStaff(pharmacyId: string, data: { email: string; role: string; locationId?: string }): Promise<any> {
     if (!pharmacyId) {
       throw new Error('Pharmacy ID is required to invite staff');
     }
     
-    const response = await api.post(`/pharmacy-management/pharmacies/${pharmacyId}/pharmacists`, data);
-    return response.data;
+    const response = await api.post(`/pharmacy-management/pharmacies/${pharmacyId}/pharmacists`, {
+      email: data.email,
+      role: data.role,
+      locationId: data.locationId
+    });
+    return response.data.data || response.data;
   },
 
   async updateUserRole(pharmacyId: string, userId: string, role: string): Promise<any> {

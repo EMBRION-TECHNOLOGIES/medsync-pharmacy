@@ -12,9 +12,65 @@ import { Building2, Bell, Plus } from 'lucide-react';
 import { usePharmacyProfile } from '@/features/pharmacy/hooks';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { ShieldCheck, Clock, AlertTriangle, Mail } from 'lucide-react';
+import { Pharmacy } from '@/lib/zod-schemas';
+
+type PharmacyWithVerification = Pharmacy & {
+  verificationStatus?: 'pending' | 'approved' | 'rejected';
+  verificationNotes?: string | null;
+  verifiedAt?: string | null;
+};
+
+type PharmacyProfileResponse = 
+  | PharmacyWithVerification
+  | { pharmacy: PharmacyWithVerification | null }
+  | null
+  | undefined;
 
 export default function SettingsPage() {
   const { data: pharmacy, isLoading, error } = usePharmacyProfile();
+  const pharmacyData = pharmacy as PharmacyProfileResponse;
+  
+  // Extract profile from nested or direct structure
+  const profile: PharmacyWithVerification | null = 
+    pharmacyData && typeof pharmacyData === 'object' && 'pharmacy' in pharmacyData
+      ? pharmacyData.pharmacy
+      : (pharmacyData && typeof pharmacyData === 'object' && 'id' in pharmacyData)
+      ? pharmacyData as PharmacyWithVerification
+      : null;
+  const verificationStatusRaw = profile?.verificationStatus || 'pending';
+  const verificationStatus = typeof verificationStatusRaw === 'string'
+    ? verificationStatusRaw.toLowerCase()
+    : 'pending';
+  const verificationNotes = profile?.verificationNotes || '';
+  const verificationEmail = 'admin@medsync.ng';
+
+  const statusConfig = (() => {
+    switch (verificationStatus) {
+      case 'approved':
+        return {
+          label: 'Verified Pharmacy',
+          className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/40',
+          icon: <ShieldCheck className="h-4 w-4" />,
+          description: 'Your pharmacy is approved to process orders and dispatch medication.',
+        };
+      case 'rejected':
+        return {
+          label: 'Verification Rejected',
+          className: 'bg-destructive/10 text-destructive border-destructive/40',
+          icon: <AlertTriangle className="h-4 w-4" />,
+          description: 'We could not verify your pharmacy. Review the notes below and resubmit your documents.',
+        };
+      default:
+        return {
+          label: 'Pending Verification',
+          className: 'bg-amber-100 text-amber-900 border-amber-300',
+          icon: <Clock className="h-4 w-4" />,
+          description: 'Send in your license and ID so we can manually approve your pharmacy.',
+        };
+    }
+  })();
   
   // Notification preferences state
   const [notifications, setNotifications] = useState({
@@ -53,6 +109,8 @@ export default function SettingsPage() {
   if (process.env.NODE_ENV === 'development') {
     console.log('Settings Page Debug:', {
       pharmacy,
+      pharmacyData,
+      profile,
       isLoading,
       error,
       pharmacyType: typeof pharmacy,
@@ -87,7 +145,7 @@ export default function SettingsPage() {
   }
 
   // Check if pharmacy is null (user hasn't registered a pharmacy yet)
-  if (pharmacy && (pharmacy as any)?.pharmacy === null) {
+  if (pharmacyData && 'pharmacy' in pharmacyData && pharmacyData.pharmacy === null) {
     return (
       <div className="space-y-6">
         <div>
@@ -142,11 +200,43 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="outline" className={statusConfig.className}>
+                  <span className="flex items-center gap-1">
+                    {statusConfig.icon}
+                    {statusConfig.label}
+                  </span>
+                </Badge>
+                {verificationStatus !== 'approved' && (
+                  <a
+                    href={`mailto:${verificationEmail}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {verificationEmail}
+                  </a>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">{statusConfig.description}</p>
+              {verificationStatus !== 'approved' && (
+                <ul className="list-disc pl-5 text-xs text-muted-foreground space-y-1">
+                  <li>Attach your PCN license and supervising pharmacist ID.</li>
+                  <li>Include the email and phone number linked to this account.</li>
+                </ul>
+              )}
+              {verificationStatus === 'rejected' && verificationNotes && (
+                <p className="text-sm font-medium text-destructive">
+                  Reviewer notes: {verificationNotes}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Pharmacy Name</Label>
               <Input
                 id="name"
-                defaultValue={(pharmacy as any)?.name || 'Not available'}
+                defaultValue={profile?.name || 'Not available'}
                 disabled
               />
             </div>
@@ -154,7 +244,7 @@ export default function SettingsPage() {
               <Label htmlFor="license">License Number</Label>
               <Input
                 id="license"
-                defaultValue={(pharmacy as any)?.licenseNumber || 'Not available'}
+                defaultValue={profile?.licenseNumber || 'Not available'}
                 disabled
               />
             </div>
@@ -162,7 +252,7 @@ export default function SettingsPage() {
               <Label htmlFor="address">Primary Address</Label>
               <Input
                 id="address"
-                defaultValue={(pharmacy as any)?.address || 'Not available'}
+                defaultValue={profile?.address || 'Not available'}
                 disabled
               />
             </div>
@@ -170,7 +260,7 @@ export default function SettingsPage() {
               <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
-                defaultValue={(pharmacy as any)?.phone || 'Not available'}
+                defaultValue={profile?.phone || 'Not available'}
                 disabled
               />
             </div>

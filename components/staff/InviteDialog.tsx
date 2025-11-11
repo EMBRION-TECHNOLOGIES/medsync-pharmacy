@@ -22,12 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useInviteStaff } from '@/features/pharmacy/hooks';
+import { useInviteStaff, useLocations } from '@/features/pharmacy/hooks';
 import { UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 
 const inviteSchema = z.object({
   email: z.string().email('Invalid email address'),
   role: z.enum(['ADMIN', 'PHARMACIST', 'DISPATCH', 'VIEWER']),
+  locationId: z.string().optional(),
 });
 
 type InviteInput = z.infer<typeof inviteSchema>;
@@ -39,6 +41,7 @@ interface InviteDialogProps {
 export function InviteDialog({ pharmacyId }: InviteDialogProps) {
   const [open, setOpen] = useState(false);
   const inviteStaff = useInviteStaff(pharmacyId);
+  const { data: locations } = useLocations(pharmacyId);
 
   // Don't render if no pharmacy ID
   if (!pharmacyId) {
@@ -60,24 +63,32 @@ export function InviteDialog({ pharmacyId }: InviteDialogProps) {
   });
 
   const selectedRole = watch('role');
+  const selectedLocationId = watch('locationId');
 
   const onSubmit = async (data: InviteInput) => {
     try {
-      await inviteStaff.mutateAsync(data);
+      const result = await inviteStaff.mutateAsync({
+        email: data.email,
+        role: data.role,
+        locationId: data.locationId || undefined
+      });
+      
+      toast.success(
+        result.inviteLink 
+          ? 'Invitation sent! Share the link with the staff member.'
+          : 'Staff member added successfully!'
+      );
+      
+      if (result.inviteLink && process.env.NODE_ENV === 'development') {
+        console.log('Invitation link:', result.inviteLink);
+      }
+      
       setOpen(false);
       reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to invite staff:', error);
-      // Show user-friendly error message
-      if (error instanceof Error) {
-        if (error.message.includes('Pharmacy ID is required')) {
-          alert('You need to complete pharmacy registration before inviting staff members.');
-        } else if (error.message.includes('404')) {
-          alert('Pharmacy management endpoint not available. Please contact support.');
-        } else {
-          alert('Failed to invite staff member. Please try again.');
-        }
-      }
+      const errorMessage = error?.response?.data?.error?.message || error?.message || 'Failed to invite staff member';
+      toast.error(errorMessage);
     }
   };
 
@@ -130,6 +141,32 @@ export function InviteDialog({ pharmacyId }: InviteDialogProps) {
               <p className="text-sm text-destructive">{errors.role.message}</p>
             )}
           </div>
+
+          {locations && locations.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="locationId">Location (Optional)</Label>
+              <Select
+                value={selectedLocationId || '__all__'}
+                onValueChange={(value) => setValue('locationId', value === '__all__' ? undefined : value)}
+                disabled={inviteStaff.isPending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a location (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name || 'Unnamed Location'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Assign staff to a specific location, or select "All Locations" for access to all branches
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-2 justify-end">
             <Button

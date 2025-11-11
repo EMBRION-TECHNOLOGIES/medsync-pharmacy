@@ -1,7 +1,21 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+
+const envBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+const resolvedBaseUrl =
+  envBaseUrl && envBaseUrl.length > 0
+    ? envBaseUrl.replace(/\/$/, '')
+    : process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000/api/v1'
+      : undefined;
+
+if (!resolvedBaseUrl) {
+  console.warn(
+    '[MedSync] NEXT_PUBLIC_API_BASE_URL is not set. API calls may fail until it is configured.'
+  );
+}
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: resolvedBaseUrl,
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -59,8 +73,8 @@ api.interceptors.response.use(
     // Unwrap API response format: { success, data, message, timestamp, correlationId }
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       if (response.data.success) {
-        // Check if response has pagination metadata
-        const hasPagination = 'page' in response.data || 'pageSize' in response.data || 'total' in response.data;
+        // Check if response has pagination metadata (check both top-level and nested)
+        const hasPagination = 'page' in response.data || 'pageSize' in response.data || 'total' in response.data || 'pagination' in response.data;
         
         if (hasPagination) {
           // Return the whole response.data object to preserve pagination
@@ -78,18 +92,36 @@ api.interceptors.response.use(
     // If response doesn't have success field, return as is
     return response;
   },
-  (error) => {
+  (error: AxiosError) => {
     // Debug logging for API errors
     if (process.env.NODE_ENV === 'development') {
-      console.error('API Error:', {
+      const errorPayload: Record<string, unknown> = {
+        message: error.message,
+        code: error.code,
         url: error.config?.url,
+        baseURL: error.config?.baseURL,
         method: error.config?.method,
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
         headers: error.response?.headers,
-        requestData: error.config?.data
-      });
+        requestData: error.config?.data,
+      };
+
+      if ((error as any).toJSON) {
+        try {
+          errorPayload.serialized = (error as any).toJSON();
+        } catch (serializationError) {
+          errorPayload.serializationError = (serializationError as Error).message;
+        }
+      }
+
+      try {
+        console.error('API Error payload:', JSON.stringify(errorPayload, null, 2));
+      } catch {
+        console.error('API Error payload (raw object):', errorPayload);
+      }
+      console.error('API Error raw:', error);
     }
     
     if (error.response?.status === 401) {

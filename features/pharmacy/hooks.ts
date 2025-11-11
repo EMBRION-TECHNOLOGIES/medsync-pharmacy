@@ -10,7 +10,7 @@ export const usePharmacy = (pharmacyId?: string) => {
   });
 };
 
-export const usePharmacyProfile = () => {
+export const usePharmacyProfile = (options: { enabled?: boolean } = {}) => {
   return useQuery({
     queryKey: ['pharmacy', 'profile'],
     queryFn: () => {
@@ -19,7 +19,7 @@ export const usePharmacyProfile = () => {
       }
       return pharmacyService.getPharmacyProfile();
     },
-    enabled: true, // Ensure the query is enabled
+    enabled: options.enabled ?? true, // Ensure the query is enabled
     retry: 1, // Retry once on failure
     staleTime: 5 * 60 * 1000, // 5 minutes
     onError: (error) => {
@@ -76,7 +76,7 @@ export const useInviteStaff = (pharmacyId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { email: string; role: string }) => {
+    mutationFn: (data: { email: string; role: string; locationId?: string }) => {
       if (!pharmacyId) {
         throw new Error('Pharmacy ID is required to invite staff');
       }
@@ -84,6 +84,7 @@ export const useInviteStaff = (pharmacyId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'staff'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
     },
     onError: (error) => {
       console.error('Failed to invite staff:', error);

@@ -121,8 +121,9 @@ export const authService = {
       );
     }
     
-    // Only set pharmacyId if not already present
-    if (!user.pharmacyId) {
+    // Only set pharmacyId if not already present AND user is a pharmacy role
+    // Admins don't have pharmacies, so skip this for them
+    if (!user.pharmacyId && (user.role === 'PHARMACIST' || user.role === 'PHARMACY_OWNER')) {
       try {
         const pharmacyResponse = await api.get('/pharmacy-management/my-pharmacy');
         if (pharmacyResponse.data?.pharmacy) {

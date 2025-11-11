@@ -61,6 +61,8 @@ export const pharmacyRegistrationSchema = z.object({
   path: ["confirmPassword"],
 });
 
+export const verificationStatusSchema = z.enum(['pending', 'approved', 'rejected']);
+
 export const tokensSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
@@ -76,6 +78,9 @@ export const authUserSchema = z.object({
   pharmacyId: z.string().optional(),
   phone: z.string().optional(),
   createdAt: z.string(),
+  verificationStatus: verificationStatusSchema.optional(),
+  verificationNotes: z.string().nullable().optional(),
+  verifiedAt: z.string().nullable().optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -83,6 +88,7 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type PharmacyRegistrationInput = z.infer<typeof pharmacyRegistrationSchema>;
 export type Tokens = z.infer<typeof tokensSchema>;
 export type AuthUser = z.infer<typeof authUserSchema>;
+export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
 
 // Order schemas - Updated to match API
 export const orderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'DISPENSED', 'DELIVERED', 'CANCELLED']);

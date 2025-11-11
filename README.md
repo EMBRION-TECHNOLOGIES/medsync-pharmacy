@@ -72,6 +72,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Manual Verification Smoke Test
+
+After deploying the latest changes, run this quick check to confirm the KYC gating works end-to-end:
+
+1. Register a new pharmacy account via `/signup`.
+2. Login as the new owner; confirm the dashboard displays the pending verification banner and orders/dispatch/chat are blocked.
+3. Visit `/settings` to verify the status card shows `Pending Verification` and the support email link.
+4. Login as an `ADMIN` user and open `/admin/verification` to review pending pharmacies, approve/reject, and view history.
+5. After approving, refresh the owner session to ensure the banner disappears and restricted modules unlock.
+
+> Tip: use the new admin page to record notes when rejecting and confirm they surface back in the owner experience.
+
 ### Build
 
 Create a production build:

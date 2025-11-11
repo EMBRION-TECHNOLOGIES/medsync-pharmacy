@@ -13,24 +13,53 @@ export function useChatOrdersSocket() {
   // Use singleton socket service instead of creating new instances
   const socket = socketService;
 
+  // Only connect socket for pharmacy roles (PHARMACY_OWNER, PHARMACIST)
+  // Admins don't need pharmacy socket connections
+  const isPharmacyRole = user?.role === 'PHARMACY_OWNER' || user?.role === 'PHARMACIST';
+  const shouldConnect = isPharmacyRole && (user?.pharmacyId || pharmacyId);
+
   useEffect(() => {
-    if (!user?.pharmacyId) return;
+    // Don't connect for admins or if no pharmacyId
+    if (!shouldConnect || !pharmacyId) {
+      // If socket is connected but shouldn't be, disconnect it
+      if (socket.isConnected()) {
+        console.log('🔌 Disconnecting socket - user is admin or no pharmacyId');
+        socket.disconnect();
+      }
+      return;
+    }
 
     const getToken = () => {
       return typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     };
 
+    // Capture current values to use in callbacks
+    const currentPharmacyId = pharmacyId;
+    const currentIsPharmacyRole = isPharmacyRole;
+    const currentUserRole = user?.role;
+
     socket.connect(getToken, {
       onConnect: () => {
         console.log('🎉 onConnect callback triggered!');
-        console.log('pharmacyId:', pharmacyId);
+        console.log('pharmacyId:', currentPharmacyId);
+        console.log('user role:', currentUserRole);
         
-        if (pharmacyId) {
-          console.log('✅ Joining pharmacy room:', pharmacyId);
-          socket.joinPharmacy(pharmacyId);
-          console.log('✅ Pharmacy room joined. Listening for messages to pharmacy:{pharmacyId}');
+        // Double-check we have pharmacyId and are pharmacy role before joining
+        if (currentPharmacyId && currentIsPharmacyRole) {
+          console.log('✅ Joining pharmacy room:', currentPharmacyId);
+          socket.joinPharmacy(currentPharmacyId);
+          console.log(`✅ Pharmacy room joined. Listening for messages to pharmacy:${currentPharmacyId}`);
         } else {
-          console.error('❌ No pharmacyId to join!');
+          console.warn('⚠️ Cannot join pharmacy room - missing pharmacyId or not pharmacy role', {
+            pharmacyId: currentPharmacyId,
+            role: currentUserRole,
+            isPharmacyRole: currentIsPharmacyRole
+          });
+          // Disconnect if we shouldn't be connected
+          if (!currentIsPharmacyRole || !currentPharmacyId) {
+            console.log('🔌 Disconnecting socket - invalid state for pharmacy connection');
+            socket.disconnect();
+          }
         }
       },
       onDisconnect: () => {
@@ -185,7 +214,7 @@ export function useChatOrdersSocket() {
       console.log('Cleaning up socket connection');
       socket.disconnect();
     };
-  }, [user?.pharmacyId, pharmacyId, queryClient, socket]);
+  }, [shouldConnect, pharmacyId, queryClient, socket, user?.role, user?.pharmacyId]);
 
   return socket;
 }

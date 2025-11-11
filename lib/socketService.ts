@@ -20,12 +20,26 @@ export class SocketService {
   private joinedOrderRooms = new Set<string>();
   private handlers: Handlers = {};
 
-  connect(getToken: () => string | null, handlers: Handlers = {}) {
-    if (this.socket?.connected) {
-      console.log('Socket already connected');
+  connect(getToken: () => string | null, handlers: Handlers = {}, forceReconnect = false) {
+    // If socket is already connected and not forcing reconnect, just update handlers and return
+    if (this.socket?.connected && !forceReconnect) {
+      console.log('Socket already connected, updating handlers');
+      this.handlers = { ...this.handlers, ...handlers };
       return;
     }
-    this.handlers = handlers;
+    
+    // If forcing reconnect or socket exists but not connected, disconnect it first
+    if (forceReconnect || (this.socket && !this.socket.connected)) {
+      console.log('Cleaning up existing socket before connecting');
+      if (this.socket) {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      }
+      this.socket = null;
+    }
+    
+    // Merge handlers instead of replacing
+    this.handlers = { ...this.handlers, ...handlers };
 
     // Build socket URL with namespace
     const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000';

@@ -151,6 +151,15 @@ export const ordersService = {
         total: response.data.total || 0,
       };
     } catch (error: any) {
+      if (error.response?.status === 403) {
+        return {
+          data: [],
+          page: filters.page || 1,
+          pageSize: filters.limit || 10,
+          total: 0,
+        };
+      }
+
       if (error.response?.status === 404) {
         // Fallback to chat-orders
         console.log('🔍 /orders failed, falling back to /chat-orders');

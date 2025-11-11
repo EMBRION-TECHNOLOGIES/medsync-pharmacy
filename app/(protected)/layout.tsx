@@ -5,9 +5,10 @@ import { useOrg } from '@/store/useOrg';
 import { usePharmacyProfile } from '@/features/pharmacy/hooks';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { useChatOrdersSocket } from '@/features/chat-orders/useChatOrdersSocket';
+import { AuthUser } from '@/lib/zod-schemas';
 
 export default function ProtectedLayout({
   children,
@@ -17,13 +18,41 @@ export default function ProtectedLayout({
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const { pharmacyId, setPharmacy } = useOrg();
-  const { data: pharmacyProfile, isLoading: pharmacyProfileLoading, error: pharmacyProfileError } = usePharmacyProfile();
+  const authUser = user as AuthUser | undefined;
+  const role = authUser?.role;
+  const isAdmin = role === 'ADMIN';
+  const shouldEnforceVerification = role === 'PHARMACY_OWNER' || role === 'PHARMACIST';
+  // Only fetch pharmacy profile for pharmacy roles, not admins
+  // Explicitly disable for admins to prevent 403 errors
+  const { data: pharmacyProfile, isLoading: pharmacyProfileLoading, error: pharmacyProfileError } = usePharmacyProfile({
+    enabled: !isAdmin && shouldEnforceVerification,
+  });
+  const pathname = usePathname();
   
   // CRITICAL: All hooks must be called before any conditional returns
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Initialize socket connection globally for all protected pages
+  // The hook itself will check if user is pharmacy role and has pharmacyId
+  // Admins won't connect to pharmacy rooms
   useChatOrdersSocket();
+  
+  const verificationStatusRaw = authUser?.verificationStatus || 'pending';
+  const verificationStatus = typeof verificationStatusRaw === 'string'
+    ? verificationStatusRaw.toLowerCase()
+    : 'pending';
+  const verificationNotes = authUser?.verificationNotes || '';
+  const isAwaitingVerification = shouldEnforceVerification && verificationStatus !== 'approved';
+  const blockedPrefixes = useMemo(
+    () => ['/dashboard', '/orders', '/chat', '/dispatch', '/locations'],
+    []
+  );
+  const isBlockedRoute =
+    isAwaitingVerification &&
+    pathname !== null &&
+    blockedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const verificationEmail = 'admin@medsync.ng';
+
   
   // Debug logging for development
   if (process.env.NODE_ENV === 'development') {
@@ -44,10 +73,12 @@ export default function ProtectedLayout({
   }, [isAuthenticated, isLoading, router]);
 
   // Redirect PHARMACY_OWNER users without pharmacy to complete registration
+  // Skip this for admin users
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'PHARMACY_OWNER' && !pharmacyProfileLoading) {
+    if (isAuthenticated && !isAdmin && authUser?.role === 'PHARMACY_OWNER' && !pharmacyProfileLoading) {
       // Check if user doesn't have a pharmacy assigned
-      if (pharmacyProfile && (pharmacyProfile as any)?.pharmacy === null) {
+      const pharmacyData = pharmacyProfile as { pharmacy: { id: string } | null } | null | undefined;
+      if (pharmacyData && pharmacyData.pharmacy === null) {
         // Only redirect if we're not already on the signup page and not on the login page
         const currentPath = window.location.pathname;
         if (currentPath !== '/signup' && currentPath !== '/login') {
@@ -55,14 +86,19 @@ export default function ProtectedLayout({
         }
       }
     }
-  }, [isAuthenticated, user, pharmacyProfile, pharmacyProfileLoading, router]);
+  }, [isAuthenticated, isAdmin, authUser, pharmacyProfile, pharmacyProfileLoading, router]);
 
   useEffect(() => {
-    // Set pharmacy ID from pharmacy profile if available
-    if (pharmacyProfile?.id && !pharmacyId) {
-      setPharmacy(pharmacyProfile.id, pharmacyProfile.name);
+    // Set pharmacy ID from pharmacy profile if available (skip for admins)
+    if (!isAdmin) {
+      const pharmacyData = pharmacyProfile as { id?: string; name?: string; pharmacy?: { id: string; name: string } } | null | undefined;
+      const pharmacyIdToSet = pharmacyData?.pharmacy?.id || pharmacyData?.id;
+      const pharmacyNameToSet = pharmacyData?.pharmacy?.name || pharmacyData?.name;
+      if (pharmacyIdToSet && !pharmacyId && pharmacyNameToSet) {
+        setPharmacy(pharmacyIdToSet, pharmacyNameToSet);
+      }
     }
-  }, [pharmacyProfile, pharmacyId, setPharmacy]);
+  }, [pharmacyProfile, pharmacyId, setPharmacy, isAdmin]);
 
   // Socket connection is now handled by individual page hooks
   // No need for global socket management in layout
@@ -99,7 +135,56 @@ export default function ProtectedLayout({
       <div className="lg:pl-64">
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
         <main className="py-6 px-4 sm:px-6 lg:px-8">
-          {children}
+          {isAwaitingVerification && (
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold uppercase tracking-wide text-xs text-amber-700">Verification Pending</span>
+                </div>
+                <p className="text-sm">
+                  Thanks for registering your pharmacy. Please email your PCN license, supervising pharmacist ID, and account email to{' '}
+                  <a className="font-semibold underline" href={`mailto:${verificationEmail}`}>
+                    {verificationEmail}
+                  </a>{' '}
+                  so our team can approve your account.
+                </p>
+                {verificationNotes && (
+                  <p className="text-sm font-medium text-amber-900">
+                    Notes from reviewer: {verificationNotes}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isBlockedRoute ? (
+            <div className="mx-auto max-w-2xl space-y-4 rounded-lg border border-dashed border-amber-300 bg-card p-8 text-center shadow-sm">
+              <h2 className="text-2xl font-semibold text-foreground">Awaiting Manual Verification</h2>
+              <p className="text-muted-foreground">
+                We’ve limited access to order, chat, dispatch, and inventory features until your pharmacy is approved.
+              </p>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
+                <p className="font-medium">To complete verification, send:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>Pharmacy Council of Nigeria (PCN) license for this location</li>
+                  <li>Government-issued ID for the supervising pharmacist</li>
+                  <li>The email + phone number used for this registration</li>
+                </ul>
+                <p className="mt-3">
+                  Email everything to{' '}
+                  <a className="font-semibold underline" href={`mailto:${verificationEmail}`}>
+                    {verificationEmail}
+                  </a>{' '}
+                  and we’ll confirm once your account is live.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                You can still review settings or contact support while we finish the review.
+              </p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
     </div>
