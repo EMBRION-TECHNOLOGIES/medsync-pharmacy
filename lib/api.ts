@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { toast } from 'sonner';
 
 const envBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 const resolvedBaseUrl =
@@ -73,15 +74,41 @@ api.interceptors.response.use(
     // Unwrap API response format: { success, data, message, timestamp, correlationId }
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       if (response.data.success) {
-        // Check if response has pagination metadata (check both top-level and nested)
-        const hasPagination = 'page' in response.data || 'pageSize' in response.data || 'total' in response.data || 'pagination' in response.data;
+        const nestedData = response.data.data;
+        // ✅ FIX: Check for pagination at the response.data level (not nestedData)
+        // Backend returns: { success: true, data: [...], pagination: {...} }
+        const hasPagination = response.data.pagination !== undefined;
+        const nestedHasPagination = nestedData && (
+          'page' in nestedData || 
+          'pageSize' in nestedData || 
+          'total' in nestedData || 
+          'pagination' in nestedData ||
+          'totalPages' in nestedData ||
+          'limit' in nestedData
+        );
         
         if (hasPagination) {
-          // Return the whole response.data object to preserve pagination
-          return { ...response, data: response.data };
+          // ✅ FIX: Return both data and pagination from response.data level
+          // Backend returns: { success: true, data: [...], pagination: {...} }
+          // Frontend expects: { data: [...], pagination: {...} }
+          return { 
+            ...response, 
+            data: {
+              data: nestedData || response.data.data || [],
+              pagination: response.data.pagination || {
+                total: 0,
+                limit: Number(response.data.pagination?.limit || 10),
+                offset: Number(response.data.pagination?.offset || 0),
+                hasMore: false
+              }
+            }
+          };
+        } else if (nestedHasPagination) {
+          // Return the nested data object to preserve pagination
+          return { ...response, data: nestedData };
         } else {
           // Return unwrapped data for non-paginated responses
-          return { ...response, data: response.data.data };
+          return { ...response, data: nestedData || response.data.data };
         }
       } else {
         // For failed API responses, return the response as is
@@ -93,8 +120,46 @@ api.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // Debug logging for API errors
-    if (process.env.NODE_ENV === 'development') {
+    // Extract user-friendly error message
+    let errorMessage = 'An error occurred. Please try again.';
+    const errorData = error.response?.data as { error?: { message?: string }; message?: string } | undefined;
+    
+    // Get error message from API response
+    if (errorData?.error?.message) {
+      errorMessage = errorData.error.message;
+    } else if (errorData?.message) {
+      errorMessage = errorData.message;
+    } else if (error.message) {
+      // Handle network errors
+      if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to server. Please check if the backend is running.';
+      } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    // Show toast notification for errors (except 401 which is handled separately)
+    if (error.response?.status !== 401 && typeof window !== 'undefined') {
+      // Don't show toast for login errors (they're handled in the form)
+      const isLoginError = error.config?.url?.includes('/auth/login');
+      // Don't show toast for geocoding errors (they fallback to direct Google API)
+      const isGeocodingError = error.config?.url?.includes('/geo/');
+      
+      if (!isLoginError && !isGeocodingError) {
+        toast.error('Error', {
+          description: errorMessage,
+          duration: 5000,
+        });
+      }
+    }
+
+    // Debug logging for API errors (suppress for geocoding endpoints since fallback is expected)
+    const isGeocodingError = error.config?.url?.includes('/geo/');
+    if (process.env.NODE_ENV === 'development' && !isGeocodingError) {
       const errorPayload: Record<string, unknown> = {
         message: error.message,
         code: error.code,
@@ -106,11 +171,12 @@ api.interceptors.response.use(
         data: error.response?.data,
         headers: error.response?.headers,
         requestData: error.config?.data,
+        userMessage: errorMessage,
       };
 
-      if ((error as any).toJSON) {
+      if (typeof (error as { toJSON?: () => unknown }).toJSON === 'function') {
         try {
-          errorPayload.serialized = (error as any).toJSON();
+          errorPayload.serialized = (error as { toJSON: () => unknown }).toJSON();
         } catch (serializationError) {
           errorPayload.serializationError = (serializationError as Error).message;
         }
@@ -124,19 +190,23 @@ api.interceptors.response.use(
       console.error('API Error raw:', error);
     }
     
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.config) {
       // Handle token refresh on 401
       const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-      if (refreshToken && !error.config._retry) {
-        error.config._retry = true;
+      const config = error.config as typeof error.config & { _retry?: boolean };
+      
+      if (refreshToken && !config._retry) {
+        config._retry = true;
         return api.post('/auth/refresh', { refreshToken })
           .then((response) => {
             if (typeof window !== 'undefined') {
               localStorage.setItem('accessToken', response.data.tokens.accessToken);
               localStorage.setItem('refreshToken', response.data.tokens.refreshToken);
             }
-            error.config.headers.Authorization = `Bearer ${response.data.tokens.accessToken}`;
-            return api(error.config);
+            if (config.headers) {
+              config.headers.Authorization = `Bearer ${response.data.tokens.accessToken}`;
+            }
+            return api(config);
           })
           .catch(() => {
             // Refresh failed, redirect to login

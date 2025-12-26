@@ -118,9 +118,12 @@ export const useLogin = () => {
         router.push('/dashboard');
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Login error:', error);
       authService.clearTokens();
+      
+      // Error toast is handled in the login form component
+      // This ensures we don't show duplicate toasts
     },
   });
 };

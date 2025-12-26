@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Package, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ordersService } from '@/features/orders/service';
@@ -20,6 +21,7 @@ interface DrugItem {
   id: string;
   drugName: string;
   quantity: string;
+  unit: string;
   dosageSig: string;
   priceNgn: string;
   isExpanded: boolean;
@@ -33,6 +35,7 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
       id: '1',
       drugName: '',
       quantity: '',
+      unit: 'tablets',
       dosageSig: '',
       priceNgn: '',
       isExpanded: true
@@ -45,6 +48,7 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
       id: newId,
       drugName: '',
       quantity: '',
+      unit: 'tablets',
       dosageSig: '',
       priceNgn: '',
       isExpanded: true
@@ -132,10 +136,11 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
       setLoading(true);
       
       // Prepare order data - support both single and multi-drug formats
-      const orderData = validDrugs.length === 1 
+      const orderData = validDrugs.length === 1
         ? {
             drugName: validDrugs[0].drugName,
             quantity: parseInt(validDrugs[0].quantity, 10),
+            unit: validDrugs[0].unit,
             dosageSig: validDrugs[0].dosageSig,
             priceNgn: parseFloat(validDrugs[0].priceNgn)
           }
@@ -143,6 +148,7 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
             items: validDrugs.map(drug => ({
               drugName: drug.drugName,
               quantity: parseInt(drug.quantity, 10),
+              unit: drug.unit,
               dosageSig: drug.dosageSig,
               priceNgn: parseFloat(drug.priceNgn)
             }))
@@ -212,6 +218,7 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
         id: '1',
         drugName: '',
         quantity: '',
+        unit: 'tablets',
         dosageSig: '',
         priceNgn: '',
         isExpanded: true
@@ -324,7 +331,7 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
                 {/* Drug Content - Collapsible */}
                 {drug.isExpanded && (
                   <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor={`drugName-${drug.id}`}>Drug Name *</Label>
                         <Input
@@ -336,17 +343,46 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor={`quantity-${drug.id}`}>Quantity *</Label>
-                        <Input
-                          id={`quantity-${drug.id}`}
-                          type="number"
-                          placeholder="e.g., 20"
-                          value={drug.quantity}
-                          onChange={(e) => updateDrug(drug.id, 'quantity', e.target.value)}
-                          min="1"
-                          required
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`quantity-${drug.id}`}>Quantity *</Label>
+                          <Input
+                            id={`quantity-${drug.id}`}
+                            type="number"
+                            placeholder="e.g., 20"
+                            value={drug.quantity}
+                            onChange={(e) => updateDrug(drug.id, 'quantity', e.target.value)}
+                            min="1"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`unit-${drug.id}`}>Unit *</Label>
+                          <Select
+                            value={drug.unit}
+                            onValueChange={(value) => updateDrug(drug.id, 'unit', value)}
+                          >
+                            <SelectTrigger id={`unit-${drug.id}`} className="w-full">
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="tablets">Tablets</SelectItem>
+                              <SelectItem value="capsules">Capsules</SelectItem>
+                              <SelectItem value="packs">Packs</SelectItem>
+                              <SelectItem value="strips">Strips</SelectItem>
+                              <SelectItem value="cards">Cards</SelectItem>
+                              <SelectItem value="boxes">Boxes</SelectItem>
+                              <SelectItem value="bottles">Bottles</SelectItem>
+                              <SelectItem value="vials">Vials</SelectItem>
+                              <SelectItem value="sachets">Sachets</SelectItem>
+                              <SelectItem value="ampules">Ampules</SelectItem>
+                              <SelectItem value="tubes">Tubes</SelectItem>
+                              <SelectItem value="syringes">Syringes</SelectItem>
+                              <SelectItem value="inhalers">Inhalers</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
 

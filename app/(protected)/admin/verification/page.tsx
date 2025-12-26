@@ -69,10 +69,10 @@ const statusMeta = {
 } as const;
 
 const statusOptions = [
+  { value: 'all', label: 'All statuses' },
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
-  { value: 'all', label: 'All statuses' },
 ];
 
 export default function PharmacyVerificationPage() {
@@ -80,7 +80,7 @@ export default function PharmacyVerificationPage() {
   const authUser = user as AuthUser | undefined;
   const isAdmin = authUser?.role === 'ADMIN';
   
-  const [statusFilter, setStatusFilter] = useState<string>('pending');
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // ✅ FIX: Default to 'all' to show all pharmacies
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -102,8 +102,9 @@ export default function PharmacyVerificationPage() {
   const updateStatus = useUpdatePharmacyVerification();
 
   const list = data as AdminPharmacyListResponse | undefined;
-  const total = list?.pagination.total ?? 0;
-  const hasMore = list?.pagination.hasMore ?? false;
+  // ✅ FIX: Handle undefined pagination safely
+  const total = list?.pagination?.total ?? 0;
+  const hasMore = list?.pagination?.hasMore ?? false;
   const records = list?.data ?? [];
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -113,7 +114,7 @@ export default function PharmacyVerificationPage() {
   };
 
   const handleResetFilters = () => {
-    setStatusFilter('pending');
+    setStatusFilter('all'); // ✅ FIX: Default to 'all' to show all pharmacies
     setSearchInput('');
     setAppliedSearch('');
     setPage(0);

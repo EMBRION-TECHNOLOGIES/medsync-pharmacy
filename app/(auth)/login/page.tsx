@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +31,28 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login.mutateAsync(data);
-    } catch (error) {
+      toast.success('Login successful!', {
+        description: 'Welcome back to MedSync Pharmacy Portal',
+      });
+    } catch (error: any) {
       console.error('Login failed:', error);
+      
+      // Extract user-friendly error message
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+      
+      if (error?.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      // Show toast notification
+      toast.error('Login Failed', {
+        description: errorMessage,
+        duration: 5000,
+      });
     } finally {
       setIsLoading(false);
     }

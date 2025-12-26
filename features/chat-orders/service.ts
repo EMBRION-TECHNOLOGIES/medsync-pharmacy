@@ -30,13 +30,34 @@ export const chatOrdersService = {
     });
 
     const response = await api.get(`/chat-orders?${params}`);
+    
+    // The API interceptor now correctly unwraps paginated responses
+    // response.data should be the nested data object with orders, rooms, etc.
+    const responseData = response.data;
+    
+    console.log('🔍 Chat Orders API Response:', {
+      responseDataKeys: Object.keys(responseData || {}),
+      ordersCount: responseData?.orders?.length || 0,
+      roomsCount: responseData?.rooms?.length || 0,
+      total: responseData?.total,
+      sampleOrder: responseData?.orders?.[0] ? {
+        id: responseData.orders[0].id,
+        status: responseData.orders[0].status,
+        orderStatus: responseData.orders[0].orderStatus,
+        paymentStatus: responseData.orders[0].paymentStatus,
+        priceNgn: responseData.orders[0].priceNgn,
+        totalAmount: responseData.orders[0].totalAmount,
+        createdAt: responseData.orders[0].createdAt,
+      } : null
+    });
+    
     return {
-      orders: response.data.orders || [],
-      rooms: response.data.rooms || [],
-      total: response.data.total || 0,
-      page: response.data.page || 1,
-      limit: response.data.limit || 10,
-      totalPages: response.data.totalPages || 1,
+      orders: responseData?.orders || [],
+      rooms: responseData?.rooms || [],
+      total: responseData?.total || 0,
+      page: responseData?.page || 1,
+      limit: responseData?.limit || 10,
+      totalPages: responseData?.totalPages || 1,
     };
   },
 

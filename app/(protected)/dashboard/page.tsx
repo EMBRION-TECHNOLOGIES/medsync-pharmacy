@@ -62,12 +62,131 @@ export default function DashboardPage() {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  // Debug logging
+  // Calculate today's revenue from paid orders
+  const calculateTodayRevenue = () => {
+    if (!orders || orders.length === 0) return 0;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const paidOrders = orders.filter((o: any) => {
+      // Check if order is paid
+      const paymentStatus = (o.paymentStatus || '').toLowerCase();
+      const isPaid = paymentStatus === 'paid' || paymentStatus === 'success' || paymentStatus === 'completed';
+      
+      if (!isPaid) return false;
+      
+      // Only count orders CREATED today (not updated today)
+      // Revenue should reflect sales made today, not status updates
+      const createdAt = o.createdAt ? new Date(o.createdAt) : null;
+      
+      if (!createdAt) return false;
+      
+      // Check if order was created today
+      const isToday = createdAt >= today;
+      
+      return isToday;
+    });
+    
+    // Sum up the prices
+    const totalRevenue = paidOrders.reduce((sum: number, order: any) => {
+      // Handle Decimal type from Prisma (could be string or number)
+      const parsePrice = (price: any): number => {
+        if (typeof price === 'number') return price;
+        if (typeof price === 'string') return parseFloat(price) || 0;
+        return 0;
+      };
+      
+      // ALWAYS use the order's priceNgn or totalAmount first (this is the total price)
+      // Only use items calculation if priceNgn is missing
+      const orderPrice = parsePrice(order.priceNgn || order.totalAmount);
+      
+      if (orderPrice > 0) {
+        // Order has a total price, use it
+        return sum + orderPrice;
+      }
+      
+      // Fallback: Calculate from items if priceNgn is missing
+      // NOTE: items.priceNgn might be unit price, so we multiply by quantity
+      if (order.items) {
+        try {
+          const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items);
+          if (Array.isArray(items) && items.length > 0) {
+            const itemsTotal = items.reduce((itemSum: number, item: any) => {
+              const itemPrice = parsePrice(item.priceNgn || item.price || 0);
+              const quantity = item.quantity || 1;
+              return itemSum + (itemPrice * quantity);
+            }, 0);
+            return sum + itemsTotal;
+          }
+        } catch (e) {
+          // If items parsing fails, use 0
+          console.warn('Failed to parse items for order:', order.id, e);
+        }
+      }
+      
+      return sum;
+    }, 0);
+    
+    return totalRevenue;
+  };
+
+  const todayRevenue = calculateTodayRevenue();
+  const formattedRevenue = `₦${todayRevenue.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+  // Calculate total revenue for comparison
+  const totalRevenue = orders?.filter((o: any) => {
+    const paymentStatus = (o.paymentStatus || '').toLowerCase();
+    return paymentStatus === 'paid' || paymentStatus === 'success' || paymentStatus === 'completed';
+  }).reduce((sum: number, o: any) => {
+    const parsePrice = (price: any): number => {
+      if (typeof price === 'number') return price;
+      if (typeof price === 'string') return parseFloat(price) || 0;
+      return 0;
+    };
+    if (o.items && Array.isArray(o.items) && o.items.length > 0) {
+      return sum + o.items.reduce((itemSum: number, item: any) => {
+        return itemSum + (parsePrice(item.priceNgn || item.price || 0) * (item.quantity || 1));
+      }, 0);
+    }
+    return sum + parsePrice(o.priceNgn || o.totalAmount || 0);
+  }, 0) || 0;
+
+  // Debug logging - Enhanced to see actual order data
   console.log('📊 Dashboard Auto-Load:', {
     totalRooms: chatRooms?.length || 0,
     totalOrders: orders?.length || 0,
     unreadRooms: sortedThreads?.filter(t => (t.unreadCount || 0) > 0).length || 0,
     isLoading: chatOrdersLoading,
+    todayRevenue,
+    totalRevenue,
+    todayVsTotal: `${todayRevenue} / ${totalRevenue}`,
+    paidOrdersCount: orders?.filter((o: any) => {
+      const paymentStatus = (o.paymentStatus || '').toLowerCase();
+      return paymentStatus === 'paid' || paymentStatus === 'success' || paymentStatus === 'completed';
+    }).length || 0,
+    // Log first few orders to see structure
+    sampleOrders: orders?.slice(0, 3).map((o: any) => ({
+      id: o.id,
+      status: o.status,
+      orderStatus: o.orderStatus,
+      paymentStatus: o.paymentStatus,
+      priceNgn: o.priceNgn,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt
+    })) || [],
+    // Log status breakdown
+    statusBreakdown: {
+      PENDING: orders?.filter((o: any) => {
+        const status = (o.status || o.orderStatus || '').toUpperCase();
+        return status === 'PENDING';
+      }).length || 0,
+      CONFIRMED: orders?.filter((o: any) => {
+        const status = (o.status || o.orderStatus || '').toUpperCase();
+        return status === 'CONFIRMED';
+      }).length || 0,
+      allStatuses: orders?.map((o: any) => o.status || o.orderStatus) || []
+    },
     rooms: sortedThreads?.map(t => ({
       id: t.id,
       patient: t.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.name,
@@ -75,6 +194,18 @@ export default function DashboardPage() {
       lastMessage: t.lastMessage?.content?.substring(0, 50)
     })) || []
   });
+
+  // Calculate stats with proper status handling
+  const pendingOrdersCount = orders?.filter((o: any) => {
+    const status = (o.status || o.orderStatus || '').toUpperCase();
+    return status === 'PENDING' || status === 'PENDING_CONFIRMATION';
+  }).length || 0;
+
+  const readyForDispatchCount = orders?.filter((o: any) => {
+    const status = (o.status || o.orderStatus || '').toUpperCase();
+    // Orders ready for dispatch are CONFIRMED, DISPENSED, or PREPARED
+    return status === 'CONFIRMED' || status === 'DISPENSED' || status === 'PREPARED';
+  }).length || 0;
 
   const stats = [
     {
@@ -87,21 +218,21 @@ export default function DashboardPage() {
     },
     {
       name: 'Pending Orders',
-      value: orders?.filter((o: any) => o.status === 'PENDING').length || 0,
+      value: pendingOrdersCount,
       icon: Package,
       color: 'text-ms-blue',
       bgColor: 'bg-ms-blue/10',
     },
     {
       name: 'Ready for Dispatch',
-      value: orders?.filter((o: any) => o.status === 'CONFIRMED').length || 0,
+      value: readyForDispatchCount,
       icon: Truck,
       color: 'text-ms-yellow',
       bgColor: 'bg-ms-yellow/10',
     },
     {
       name: 'Today\'s Revenue',
-      value: '₦0',
+      value: formattedRevenue,
       icon: TrendingUp,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
@@ -312,22 +443,32 @@ export default function DashboardPage() {
                 </div>
               ) : orders && orders.length > 0 ? (
                 <div className="space-y-2">
-                  {orders.slice(0, 4).map((order: any) => (
-                    <div
-                      key={order.id}
-                      className="flex items-center justify-between border-b pb-2 last:border-0"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{order.patient.id}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.drugName}
-                        </p>
+                  {orders.slice(0, 4).map((order: any) => {
+                    // Safe patient display - handle null patient
+                    const patientDisplay = order.patient?.medSyncId || 
+                                         order.patientMsid || 
+                                         order.patient?.id || 
+                                         order.patientId || 
+                                         order.orderCode || 
+                                         'Unknown';
+                    
+                    return (
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between border-b pb-2 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{patientDisplay}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.drugName || 'Order'}
+                          </p>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-muted">
+                          {order.status || order.orderStatus || 'PENDING'}
+                        </span>
                       </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-muted">
-                        {order.status}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No recent orders</p>

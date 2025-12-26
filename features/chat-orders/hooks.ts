@@ -9,8 +9,10 @@ export const useChatOrders = (filters: ChatOrdersFilters = {}) => {
   return useQuery({
     queryKey: ['chat-orders', { scope: 'pharmacy', pharmacyId }, filters],
     queryFn: () => chatOrdersService.getChatOrders(filters),
-    staleTime: 30000, // 30 seconds
+    staleTime: 0, // Always consider data stale to ensure fresh data on every request
     refetchInterval: 30000, // Auto-refetch every 30 seconds
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
     enabled: !!pharmacyId,
   });
 };

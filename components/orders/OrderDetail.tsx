@@ -107,7 +107,9 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">Qty: {item.quantity}</p>
+                    <p className="font-medium">
+                      Qty: {item.quantity} {item.unit || 'tablets'}
+                    </p>
                     {item.priceNgn && (
                       <p className="text-sm text-muted-foreground">
                         ₦{item.priceNgn.toLocaleString()}
@@ -145,7 +147,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             )}
             {order.status?.toLowerCase() === 'dispensed' && (
               <div className="text-sm text-muted-foreground">
-                💊 Dispensed — courier has picked up
+                💊 Dispensed — ready for dispatch
               </div>
             )}
             {order.status?.toLowerCase() === 'out_for_delivery' && (

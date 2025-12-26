@@ -20,7 +20,9 @@ const eventIcons = {
   PAYMENT_CAPTURED: CreditCard,
   OrderPrepared: Package,
   ORDER_PREPARED: Package,
-  ORDER_DISPENSED: Package, // Backend sends this for PREPARED status
+  ORDER_DISPENSED: CreditCard, // Payment received, ready for dispatch
+  PaymentCompleted: CreditCard,
+  PAYMENT_COMPLETED: CreditCard,
   DispatchBooked: Truck,
   DISPATCH_BOOKED: Truck,
   Delivered: CheckCircle,
@@ -36,7 +38,9 @@ const eventLabels = {
   PAYMENT_CAPTURED: 'Payment Captured',
   OrderPrepared: 'Order Prepared',
   ORDER_PREPARED: 'Order Prepared',
-  ORDER_DISPENSED: 'Order Prepared', // Backend sends this for PREPARED status
+  ORDER_DISPENSED: 'Order Paid & Ready for Dispatch', // Payment received, ready for dispatch
+  PaymentCompleted: 'Payment Completed',
+  PAYMENT_COMPLETED: 'Payment Completed',
   DispatchBooked: 'Dispatch Booked',
   DISPATCH_BOOKED: 'Dispatch Booked',
   Delivered: 'Delivered',

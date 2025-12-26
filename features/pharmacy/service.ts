@@ -56,8 +56,13 @@ export const pharmacyService = {
     if (process.env.NODE_ENV === 'development') {
       console.log('Pharmacy Profile API Response:', response.data);
     }
-    // Handle both nested and direct response structures
-    return response.data.pharmacy || response.data;
+    // ✅ FIX: Handle nested structure: { success: true, data: { pharmacy: {...} } }
+    // Backend returns: { success: true, data: { pharmacy: {...}, role: ..., permissions: ... } }
+    const pharmacyData = response.data?.data?.pharmacy || response.data?.pharmacy || response.data;
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Extracted Pharmacy Data:', pharmacyData);
+    }
+    return pharmacyData;
   },
 
   async updatePharmacyProfile(data: Partial<Pharmacy>): Promise<Pharmacy> {
@@ -66,8 +71,20 @@ export const pharmacyService = {
   },
 
   async getLocations(pharmacyId: string): Promise<Location[]> {
-    const response = await api.get(`/pharmacy-management/pharmacies/${pharmacyId}/branches`);
-    return response.data.branches;
+    // ✅ FIX: Try branches endpoint first, fallback to locations endpoint
+    try {
+      const response = await api.get(`/pharmacy-management/pharmacies/${pharmacyId}/branches`);
+      return response.data?.branches || response.data?.data || [];
+    } catch (error) {
+      // Fallback to locations endpoint
+      try {
+        const response = await api.get(`/pharmacy-management/pharmacies/${pharmacyId}/locations`);
+        return response.data?.data || response.data || [];
+      } catch (fallbackError) {
+        console.error('Failed to fetch locations:', fallbackError);
+        return [];
+      }
+    }
   },
 
   async createLocation(pharmacyId: string, data: {

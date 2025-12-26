@@ -58,7 +58,40 @@ export const pharmacyVerificationService = {
     if (params.offset) query.append('offset', params.offset.toString());
 
     const response = await api.get(`/admin/pharmacies${query.toString() ? `?${query.toString()}` : ''}`);
-    return response.data as AdminPharmacyListResponse;
+
+    // ✅ FIX: The API interceptor already unwraps the response
+    // Backend returns: { success: true, data: { pharmacies, total, limit, offset } }
+    // Interceptor returns: response.data = { pharmacies, total, limit, offset }
+    const backendData = response.data;
+
+    if (!backendData || !backendData.pharmacies) {
+      console.error('❌ Invalid API response structure:', response.data);
+      throw new Error('Invalid API response structure');
+    }
+
+    // Map pharmacyUsers to owner field
+    const pharmacies = (backendData.pharmacies || []).map((pharmacy: any) => ({
+      ...pharmacy,
+      owner: pharmacy.pharmacyUsers?.[0]?.user || null
+    }));
+
+    const transformedResponse: AdminPharmacyListResponse = {
+      data: pharmacies,
+      pagination: {
+        total: backendData.total || 0,
+        limit: backendData.limit || params.limit || 10,
+        offset: backendData.offset || 0,
+        hasMore: (backendData.offset || 0) + (backendData.pharmacies?.length || 0) < (backendData.total || 0)
+      }
+    };
+
+    console.log('✅ [PharmacyVerification] Transformed response:', {
+      pharmaciesCount: transformedResponse.data.length,
+      total: transformedResponse.pagination.total,
+      hasMore: transformedResponse.pagination.hasMore
+    });
+
+    return transformedResponse;
   },
 
   async getEvents(pharmacyId: string): Promise<VerificationEvent[]> {

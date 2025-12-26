@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, MapPin, Navigation, Shield, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
 import { pharmacyRegistrationSchema, type PharmacyRegistrationInput } from '@/lib/zod-schemas';
 import { useRegister } from '@/features/auth/hooks';
 import { pharmacyService } from '@/features/pharmacy/service';
@@ -17,6 +17,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
+import { PasswordStrength, isPasswordValid } from '@/components/ui/password-strength';
 
 type PharmacyRegistrationForm = PharmacyRegistrationInput;
 
@@ -38,8 +40,6 @@ export default function SignupPage() {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isValidatingLicense, setIsValidatingLicense] = useState(false);
   const [licenseValidationStatus, setLicenseValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid' | 'pending'>('idle');
-  const [resolvedAddress, setResolvedAddress] = useState<string>('');
-  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   // Only pharmacy owners can register a pharmacy
   const selectedRole = 'PHARMACY_OWNER' as const;
   const register = useRegister();
@@ -55,64 +55,100 @@ export default function SignupPage() {
     resolver: zodResolver(pharmacyRegistrationSchema),
   });
 
+
   // Geocoding function using browser's geolocation API
-  const getCurrentLocation = () => {
+  const getCurrentLocation = async () => {
+    // Check if geolocation is supported
     if (!navigator.geolocation) {
       toast.error('Geolocation is not supported by this browser');
       return;
     }
 
-    setIsGeocoding(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        // Use the new coordinate handler that includes reverse geocoding
-        await handleCoordinatesUpdate(latitude, longitude);
-        
-        setIsGeocoding(false);
-        toast.success('Location Updated');
-      },
-      (error) => {
-        setIsGeocoding(false);
-        toast.error('Could not detect your location. Please enter coordinates manually.');
-        console.error('Geolocation error:', error);
-      }
-    );
-  };
+    // Check if we're in a secure context (HTTPS or localhost)
+    const isSecureContext = window.isSecureContext ||
+      window.location.protocol === 'https:' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
 
-  // Simple geocoding function (you can replace with Google Maps API later)
-  const geocodeAddress = async (address: string) => {
-    if (!address.trim()) {
-      toast.error('Please enter an address first');
+    if (!isSecureContext) {
+      console.warn('Geolocation requires HTTPS or localhost. Current origin:', window.location.origin);
+      toast.error('Geolocation requires a secure connection (HTTPS). Please use HTTPS or enter coordinates manually.');
       return;
     }
 
     setIsGeocoding(true);
-    try {
-      // Using a free geocoding service (you can replace with Google Maps API)
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
-      const data = await response.json();
-      
-      if (data && data.length > 0) {
-        const { lat, lon } = data[0];
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(lon);
-        
-        // Use the new coordinate handler that includes reverse geocoding
-        await handleCoordinatesUpdate(latitude, longitude);
-        
-        toast.success('Location Recorded');
-      } else {
-        toast.error('Could not find coordinates for this address');
-      }
-    } catch (_error) {
-      toast.error('Error converting address to coordinates');
-      console.error('Geocoding error:', _error);
-    } finally {
-      setIsGeocoding(false);
-    }
+
+    const options = {
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 60000
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+
+          console.log('✅ Location obtained:', { latitude, longitude, accuracy: position.coords.accuracy });
+
+          // Set coordinates
+          setValue('latitude', latitude);
+          setValue('longitude', longitude);
+
+          // Reverse geocode to get address
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=16`
+            );
+            const data = await response.json();
+
+            if (data && data.display_name) {
+              const addressParts = data.display_name.split(',');
+              const shortAddress = addressParts.slice(0, 3).join(', ').trim();
+              setValue('address', shortAddress);
+            }
+          } catch (reverseGeoError) {
+            console.error('Reverse geocoding error:', reverseGeoError);
+            setValue('address', `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+
+          setIsGeocoding(false);
+          toast.success('Location detected successfully');
+        } catch (error: unknown) {
+          setIsGeocoding(false);
+          console.error('Error processing location:', error);
+          toast.error('Failed to process location. Please enter coordinates manually.');
+        }
+      },
+      (error: GeolocationPositionError) => {
+        setIsGeocoding(false);
+
+        let errorMessage = 'Could not detect your location. ';
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Location access was denied. ';
+            if (!isSecureContext) {
+              errorMessage += 'Note: Geolocation requires HTTPS (or localhost). ';
+            }
+            errorMessage += 'Please check browser permissions or enter coordinates manually.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable. Please ensure location services are enabled on your device or enter coordinates manually.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out. Please try again or enter coordinates manually.';
+            break;
+          default:
+            errorMessage += 'Please enter coordinates manually.';
+        }
+
+        toast.error(errorMessage);
+      },
+      options
+    );
   };
+
 
   // License validation function
   const validateLicenseNumber = (licenseNumber: string): boolean => {
@@ -150,56 +186,6 @@ export default function SignupPage() {
     }
   };
 
-  // Reverse geocoding function to get address from coordinates
-  const reverseGeocode = async (latitude: number, longitude: number): Promise<string | null> => {
-    setIsReverseGeocoding(true);
-    
-    // Set a timeout to prevent infinite loading
-    const timeoutPromise: Promise<never> = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout')), 5000); // 5 second timeout
-    });
-    
-    try {
-      const geocodingPromise: Promise<{ display_name?: string }> = fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=16`
-      ).then(async (response) => (await response.json()) as { display_name?: string });
-      
-      const data = await Promise.race([geocodingPromise, timeoutPromise]);
-      
-      if (data && data.display_name) {
-        // Format the address nicely - take first few parts for brevity
-        const addressParts = data.display_name.split(',');
-        const shortAddress = addressParts.slice(0, 3).join(', ').trim();
-        setResolvedAddress(shortAddress);
-        return shortAddress;
-      }
-      return null;
-    } catch (_error) {
-      console.error('Reverse geocoding error:', _error);
-      // Fallback: create a simple address from coordinates
-      const fallbackAddress = `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-      setResolvedAddress(fallbackAddress);
-      return fallbackAddress;
-    } finally {
-      setIsReverseGeocoding(false);
-    }
-  };
-
-  // Function to handle coordinate updates and reverse geocoding
-  const handleCoordinatesUpdate = async (latitude: number, longitude: number) => {
-    setValue('latitude', latitude);
-    setValue('longitude', longitude);
-    
-    // Start reverse geocoding in the background (non-blocking)
-    reverseGeocode(latitude, longitude).then((address: string | null) => {
-      if (address) {
-        setValue('address', address);
-        setResolvedAddress(address);
-      }
-    }).catch((error: unknown) => {
-      console.error('Background reverse geocoding failed:', error);
-    });
-  };
 
   const onSubmitStep1 = async () => {
     // Validate required fields for step 1
@@ -208,18 +194,24 @@ export default function SignupPage() {
     const email = watch('email');
     const password = watch('password');
     const confirmPassword = watch('confirmPassword');
-    
+
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
       toast.error('Please fill in all required fields');
       return;
     }
-    
+
+    // ⚠️ SECURITY: Validate password strength before proceeding
+    if (!isPasswordValid(password)) {
+      toast.error('Password does not meet security requirements. Please check all requirements above.');
+      return;
+    }
+
     // Validate password confirmation
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-    
+
     setCurrentStep(2);
   };
 
@@ -357,7 +349,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-ms-blue/10 to-ms-green/10 p-4">
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-2xl overflow-visible">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <Image
@@ -378,7 +370,7 @@ export default function SignupPage() {
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-visible">
           {/* Progress Indicator */}
           <div className="flex items-center justify-center mb-8">
             <div className="flex items-center space-x-4">
@@ -535,6 +527,11 @@ export default function SignupPage() {
                   )}
                 </div>
 
+                {/* Password Strength Indicator */}
+                {watch('password') && (
+                  <PasswordStrength password={watch('password') || ''} />
+                )}
+
                 <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
@@ -570,61 +567,24 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="address">Pharmacy Address</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="address"
-                        placeholder="123 Main Street, Lagos"
-                        {...registerField('address')}
-                        disabled={isLoading}
-                        className="flex-1"
-                        onBlur={() => {
-                          // Auto-geocode when user finishes typing address
-                          const address = watch('address');
-                          if (address && address.trim()) {
-                            geocodeAddress(address);
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => geocodeAddress(watch('address'))}
-                        disabled={isLoading || isGeocoding || !watch('address')}
-                        className="shrink-0"
-                      >
-                        <MapPin className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <AddressAutocomplete
+                      value={watch('address') || ''}
+                      onChange={(value) => setValue('address', value)}
+                      onAddressSelect={(address) => {
+                        setValue('address', address.formattedAddress);
+                        setValue('latitude', address.latitude);
+                        setValue('longitude', address.longitude);
+                        toast.success('✓ Address verified with coordinates');
+                      }}
+                      placeholder="Type to search address..."
+                      disabled={isLoading}
+                      onGeolocation={getCurrentLocation}
+                      showGeolocationButton={true}
+                      isGeolocating={isGeocoding}
+                    />
                     {errors.address && (
                       <p className="text-sm text-destructive">{errors.address.message}</p>
                     )}
-                    {watch('latitude') && watch('longitude') && (
-                      <div className="text-sm text-green-600 font-bold">
-                        {isReverseGeocoding ? (
-                          <>
-                            <div className="w-3 h-3 border-2 border-green-600 border-t-transparent rounded-full animate-spin inline-block mr-1"></div>
-                            Resolving address...
-                          </>
-                        ) : (
-                          '✓'
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={getCurrentLocation}
-                      disabled={isLoading || isGeocoding}
-                      className="w-full"
-                    >
-                      <Navigation className="h-4 w-4 mr-2" />
-                      {isGeocoding ? 'Detecting...' : 'Use My Location'}
-                    </Button>
                   </div>
 
                   <div className="space-y-2">
@@ -728,7 +688,7 @@ export default function SignupPage() {
                   <div>
                     <h4 className="font-medium">Pharmacy</h4>
                     <p className="text-sm text-muted-foreground">
-                      {watch('pharmacyName')} - {resolvedAddress || watch('address') || 'Current Location'}
+                      {watch('pharmacyName')} - {watch('address') || 'Current Location'}
                     </p>
                   </div>
                 </div>

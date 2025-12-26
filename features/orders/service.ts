@@ -33,6 +33,23 @@ export type DispatchStatusNormalized =
   | 'FAILED'
   | 'CANCELED';
 
+export interface OrderItem {
+  drugName: string;
+  dosageSig?: string;
+  quantity: number;
+  priceNgn: number;
+  drugId?: string;
+}
+
+export interface OrderDispatch {
+  id: string;
+  provider: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  eta?: string;
+  otp?: string;
+}
+
 export interface OrderDTO {
   orderId: string;
   orderCode?: string;
@@ -50,12 +67,7 @@ export interface OrderDTO {
   dosageSig?: string;
   quantity?: number;
   priceNgn?: number;
-  items?: Array<{
-    drugName: string;
-    dosageSig?: string;
-    quantity: number;
-    priceNgn: number;
-  }>;
+  items?: OrderItem[];
   // Patient/recipient info
   patientId?: string;
   patientMsid?: string;
@@ -63,13 +75,7 @@ export interface OrderDTO {
   receiverPhone?: string;
   deliveryAddress?: string;
   // Dispatch
-  dispatch?: {
-    id: string;
-    provider: string;
-    trackingNumber?: string;
-    trackingUrl?: string;
-    eta?: string;
-  };
+  dispatch?: OrderDispatch;
   events?: OrderEventDTO[];
 }
 
@@ -111,6 +117,27 @@ export const ordersService = {
     if (filters.limit) params.append('limit', String(filters.limit));
     if (filters.search) params.append('search', filters.search);
 
+      // Backend order type definition
+      interface BackendOrder {
+        id: string;
+        orderCode?: string;
+        orderStatus?: string;
+        status?: string;
+        paymentStatus?: string;
+        dispatch?: { status?: DispatchStatusNormalized };
+        isReadyForDispatch?: boolean;
+        updatedAt: string;
+        createdAt?: string;
+        drugName?: string;
+        quantity?: number;
+        priceNgn?: number;
+        items?: OrderItem[];
+        patientId?: string;
+        patientMsid?: string;
+        patient?: { medSyncId?: string };
+        events?: OrderEventDTO[];
+      }
+
     // Try /orders first, fallback to /chat-orders
     try {
       const response = await api.get(`/orders?${params}`);
@@ -124,12 +151,12 @@ export const ordersService = {
       }
       
       // Map each order from backend format to OrderDTO
-      const mappedOrders = Array.isArray(orders) ? orders.map((order: any) => {
+      const mappedOrders = Array.isArray(orders) ? orders.map((order: BackendOrder): OrderDTO => {
         console.log('🔍 Mapping order:', order.id, 'patientMsid:', order.patientMsid, 'patient:', order.patient);
         return {
         orderId: order.id,
         orderCode: order.orderCode,
-        orderStatus: order.orderStatus || order.status, // Backend might return either field
+        orderStatus: order.orderStatus || order.status || 'PENDING', // Backend might return either field
         paymentStatus: order.paymentStatus || 'Pending',
         dispatchStatus: order.dispatch?.status,
         isReadyForDispatch: order.isReadyForDispatch || false,
@@ -150,8 +177,9 @@ export const ordersService = {
         pageSize: response.data.pageSize || 10,
         total: response.data.total || 0,
       };
-    } catch (error: any) {
-      if (error.response?.status === 403) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { status?: number } };
+      if (apiError.response?.status === 403) {
         return {
           data: [],
           page: filters.page || 1,
@@ -160,7 +188,7 @@ export const ordersService = {
         };
       }
 
-      if (error.response?.status === 404) {
+      if (apiError.response?.status === 404) {
         // Fallback to chat-orders
         console.log('🔍 /orders failed, falling back to /chat-orders');
         const response = await api.get(`/chat-orders?${params}`);
@@ -168,10 +196,10 @@ export const ordersService = {
         const orders = response.data.orders || response.data.data || [];
         
         // Map chat-orders response to unified shape
-        const mappedOrders = Array.isArray(orders) ? orders.map((order: any) => ({
+        const mappedOrders = Array.isArray(orders) ? orders.map((order: BackendOrder): OrderDTO => ({
           orderId: order.id,
           orderCode: order.orderCode,
-          orderStatus: order.orderStatus || order.status, // Backend might return either field
+          orderStatus: order.orderStatus || order.status || 'PENDING', // Backend might return either field
           paymentStatus: order.paymentStatus || 'Pending',
           dispatchStatus: order.dispatch?.status,
           isReadyForDispatch: order.isReadyForDispatch || false,
@@ -194,25 +222,56 @@ export const ordersService = {
   },
 
   async getOrderUnified(id: string): Promise<OrderDTO> {
+    // Backend order response type definition
+    interface BackendOrderResponse {
+      id: string;
+      orderCode?: string;
+      orderStatus?: string;
+      paymentStatus?: string;
+      dispatch?: OrderDispatch & { status?: DispatchStatusNormalized; estimatedArrival?: string };
+      isReadyForDispatch?: boolean;
+      isConfirmed?: boolean;
+      confirmedAt?: string;
+      createdAt?: string;
+      updatedAt: string;
+      drugName?: string;
+      dosageSig?: string;
+      quantity?: number;
+      priceNgn?: number;
+      items?: OrderItem[];
+      patientId?: string;
+      patientMsid?: string;
+      patient?: { medSyncId?: string };
+      receiverName?: string;
+      receiverPhone?: string;
+      deliveryAddress?: string | { address?: string; contactName?: string; contactPhone?: string };
+      timeline?: OrderEventDTO[];
+      events?: OrderEventDTO[];
+    }
+
     try {
       const response = await api.get(`/orders/${id}`);
       
       // Axios interceptor unwraps { success, data } → data
       // So response.data is already the order object
-      const order = response.data;
+      const order = response.data as BackendOrderResponse;
       
       console.log('🔍 Order object after interceptor:', {
         id: order.id,
         orderStatus: order.orderStatus,
         paymentStatus: order.paymentStatus,
+        patientMsid: order.patientMsid,
+        patientId: order.patientId,
+        patient: order.patient,
+        receiverName: order.receiverName,
         allFields: Object.keys(order)
       });
       
       // Map backend response to OrderDTO
-      return {
+      const mapped: OrderDTO = {
         orderId: order.id,
         orderCode: order.orderCode,
-        orderStatus: order.orderStatus, // Backend returns orderStatus
+        orderStatus: order.orderStatus || 'PENDING', // Backend returns orderStatus
         paymentStatus: order.paymentStatus || 'Pending',
         dispatchStatus: order.dispatch?.status,
         isReadyForDispatch: order.isReadyForDispatch || false,
@@ -226,41 +285,52 @@ export const ordersService = {
         priceNgn: order.priceNgn,
         items: order.items, // ✅ ADD: Map items array
         patientId: order.patientId,
-        patientMsid: order.patient?.medSyncId,
-        receiverName: order.deliveryAddress?.contactName,
-        receiverPhone: order.deliveryAddress?.contactPhone,
-        deliveryAddress: order.deliveryAddress?.address,
+        patientMsid: order.patientMsid || order.patient?.medSyncId || undefined, // Backend returns patientMsid directly
+        receiverName: order.receiverName || (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.contactName : undefined), // NOTE: Should NOT be displayed to pharmacy
+        receiverPhone: order.receiverPhone || (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.contactPhone : undefined), // Backend returns receiverPhone directly
+        deliveryAddress: typeof order.deliveryAddress === 'string' ? order.deliveryAddress : (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.address : undefined),
         dispatch: order.dispatch ? {
           id: order.dispatch.id,
           provider: order.dispatch.provider,
           trackingNumber: order.dispatch.trackingNumber,
           trackingUrl: order.dispatch.trackingUrl,
-          eta: order.dispatch.estimatedArrival,
+          eta: order.dispatch.eta || order.dispatch.estimatedArrival,
         } : undefined,
         events: order.timeline || order.events || [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+      
+      console.log('✅ Mapped order DTO:', {
+        orderId: mapped.orderId,
+        patientMsid: mapped.patientMsid,
+        hasReceiverName: !!mapped.receiverName,
+        receiverName: mapped.receiverName // Log but should NOT be displayed
+      });
+      
+      return mapped;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { status?: number } };
+      if (apiError.response?.status === 404) {
         // Fallback to chat-orders
         const response = await api.get(`/chat-orders/${id}`);
-        const order = response.data.order || response.data.data?.order || response.data.data;
+        const order = (response.data.order || response.data.data?.order || response.data.data) as BackendOrderResponse;
         return {
           orderId: order.id,
           orderCode: order.orderCode,
-          orderStatus: order.orderStatus || order.status, // Backend might return either field
+          orderStatus: (order.orderStatus || (order as BackendOrderResponse & { status?: string }).status || 'PENDING') as string, // Backend might return either field
           paymentStatus: order.paymentStatus || 'Pending',
           dispatchStatus: order.dispatch?.status,
           isReadyForDispatch: order.isReadyForDispatch || false,
-          updatedAt: order.updatedAt,
+          updatedAt: order.updatedAt || new Date().toISOString(),
           events: order.events || [],
+          patientMsid: order.patientMsid || order.patient?.medSyncId || undefined,
           dispatch: order.dispatch ? {
             id: order.dispatch.id,
             provider: order.dispatch.provider,
             trackingNumber: order.dispatch.trackingNumber,
             trackingUrl: order.dispatch.trackingUrl,
-            eta: order.dispatch.estimatedArrival,
+            eta: order.dispatch.eta || order.dispatch.estimatedArrival,
           } : undefined,
-        };
+        } as OrderDTO;
       }
       throw error;
     }
@@ -299,21 +369,38 @@ export const ordersService = {
         throw new Error('Invalid response from dispense endpoint - no order data');
       }
       
+        interface DispenseOrderResponse {
+          id: string;
+          orderCode?: string;
+          status?: string;
+          orderStatus?: string;
+          paymentStatus?: string;
+          dispatch?: { status?: DispatchStatusNormalized };
+          updatedAt: string;
+          createdAt?: string;
+          drugName?: string;
+          quantity?: number;
+          priceNgn?: number;
+          events?: OrderEventDTO[];
+        }
+
+        const dispenseOrder = order as DispenseOrderResponse;
+
         return {
-          orderId: order.id,
-        orderCode: order.orderCode,
-        orderStatus: order.status || order.orderStatus,
-        paymentStatus: order.paymentStatus || 'Pending',
-          dispatchStatus: order.dispatch?.status,
+          orderId: dispenseOrder.id,
+          orderCode: dispenseOrder.orderCode,
+          orderStatus: dispenseOrder.status || dispenseOrder.orderStatus || 'PREPARED',
+          paymentStatus: dispenseOrder.paymentStatus || 'Pending',
+          dispatchStatus: dispenseOrder.dispatch?.status,
           isReadyForDispatch: true,
-          updatedAt: order.updatedAt,
-        createdAt: order.createdAt,
-        drugName: order.drugName,
-        quantity: order.quantity,
-        priceNgn: order.priceNgn,
-          events: order.events || [],
-        };
-    } catch (error: any) {
+          updatedAt: dispenseOrder.updatedAt,
+          createdAt: dispenseOrder.createdAt,
+          drugName: dispenseOrder.drugName,
+          quantity: dispenseOrder.quantity,
+          priceNgn: dispenseOrder.priceNgn,
+          events: dispenseOrder.events || [],
+        } as OrderDTO;
+    } catch (error: unknown) {
       console.error('❌ Error marking order as prepared:', error);
       throw error;
     }
@@ -382,6 +469,30 @@ export const ordersService = {
   async cancelDispatch(orderId: string): Promise<OrderDTO> {
     const response = await api.post(`/orders/${orderId}/cancel-dispatch`, {});
     return response.data as OrderDTO;
+  },
+
+  async bookDispatch(orderId: string, deliveryAddress: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  }): Promise<OrderDTO> {
+    try {
+      console.log('🚚 Booking dispatch for order:', orderId);
+      
+      // Use simple dispatch route which gets pharmacy ID from order
+      const response = await api.post('/dispatch/book', {
+        orderId,
+        deliveryAddress,
+      });
+      
+      console.log('✅ Dispatch booked:', response.data);
+      
+      // Reload order to get updated dispatch status
+      return await this.getOrderUnified(orderId);
+    } catch (error: unknown) {
+      console.error('❌ Error booking dispatch:', error);
+      throw error;
+    }
   },
 };
 

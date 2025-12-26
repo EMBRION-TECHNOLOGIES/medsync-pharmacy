@@ -30,8 +30,17 @@ export const authService = {
       }
       
       return { user, tokens };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error details:', error);
+      
+      // Enhance error with user-friendly message
+      if (error.response?.data?.error) {
+        const apiError = error.response.data.error;
+        const enhancedError = new Error(apiError.message || 'Invalid email or password');
+        (enhancedError as any).response = error.response;
+        throw enhancedError;
+      }
+      
       throw error;
     }
   },

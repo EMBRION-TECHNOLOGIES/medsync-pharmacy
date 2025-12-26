@@ -32,13 +32,28 @@ export default function SettingsPage() {
   const { data: pharmacy, isLoading, error } = usePharmacyProfile();
   const pharmacyData = pharmacy as PharmacyProfileResponse;
   
-  // Extract profile from nested or direct structure
+  // ✅ FIX: Extract profile from nested or direct structure
+  // Backend returns: { success: true, data: { pharmacy: {...} } }
+  // Frontend service may unwrap to: { pharmacy: {...} } or just {...}
   const profile: PharmacyWithVerification | null = 
     pharmacyData && typeof pharmacyData === 'object' && 'pharmacy' in pharmacyData
       ? pharmacyData.pharmacy
       : (pharmacyData && typeof pharmacyData === 'object' && 'id' in pharmacyData)
       ? pharmacyData as PharmacyWithVerification
       : null;
+  
+  // ✅ FIX: Debug logging to see what we're getting
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 Settings Page - Profile Data:', {
+      pharmacyData,
+      profile,
+      verificationStatus: profile?.verificationStatus,
+      hasVerificationStatus: !!profile?.verificationStatus,
+      profileKeys: profile ? Object.keys(profile) : null
+    });
+  }
+  
+  // ✅ FIX: Normalize verification status (handle both 'approved' and 'APPROVED')
   const verificationStatusRaw = profile?.verificationStatus || 'pending';
   const verificationStatus = typeof verificationStatusRaw === 'string'
     ? verificationStatusRaw.toLowerCase()

@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { useRouter } from 'next/navigation';
-import { ordersService, type OrderDTO } from '@/features/orders/service';
+import { useEffect, useState, use, useCallback } from 'react';
+import { ordersService, type OrderDTO, type OrderDispatch, type OrderItem } from '@/features/orders/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,8 @@ import { OTPModal } from '@/components/dispatch/OTPModal';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import { socketService } from '@/lib/socketService';
 import { toast } from 'sonner';
+import { useTrackDelivery } from '@/features/dispatch/hooks';
+import { Truck, Clock, User, MapPin, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,15 +21,18 @@ import {
 
 export default function OrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = use(params);
-  const router = useRouter();
   const [order, setOrder] = useState<OrderDTO | null>(null);
-  const [loading, setLoading] = useState(true);
   const [otpOpen, setOtpOpen] = useState(false);
   const [isReadyPending, setIsReadyPending] = useState(false);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
+  
+  // Track delivery for active delivery statuses
+  const orderStatus = (order?.orderStatus || '').toUpperCase();
+  const dispatchId = order?.dispatch?.id;
+  const isActiveDelivery = (orderStatus === 'OUT_FOR_DELIVERY' || orderStatus === 'DISPENSED') && dispatchId;
+  const { data: deliveryData } = useTrackDelivery(isActiveDelivery ? dispatchId : undefined);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const data = await ordersService.getOrderUnified(orderId);
       console.log('📦 Loaded order:', { orderId: data.orderId, orderCode: data.orderCode, status: data.orderStatus });
@@ -37,7 +41,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
       console.error('Failed to load order:', error);
       toast.error('Failed to load order details');
     }
-  };
+  }, [orderId]);
 
   useEffect(() => {
     load();
@@ -54,7 +58,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
       }
     };
 
-    const handleDispatchUpdated = (payload: any) => {
+    const handleDispatchUpdated = (payload: unknown) => {
       console.log('Dispatch updated (fallback):', payload);
       // Fallback handler - backend prefers order.updated
     };
@@ -64,33 +68,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
     s?.on('dispatch:updated', handleDispatchUpdated);
 
     // Setup polling fallback for offline mode or socket disconnect
-    const pollInterval = setInterval(() => {
-      if (!socketService.isConnected() || !pollInterval) {
+    const pollIntervalId = setInterval(() => {
+      if (!socketService.isConnected()) {
         load(); // Poll every 60s if disconnected
       }
     }, 60000);
-    setPollInterval(pollInterval);
 
     return () => {
       s?.off('order.updated', handleOrderUpdated);
       s?.off('order:updated', handleOrderUpdated);
       s?.off('dispatch:updated', handleDispatchUpdated);
       socketService.leaveOrder(orderId);
-      if (pollInterval) clearInterval(pollInterval);
+      clearInterval(pollIntervalId);
     };
-  }, [orderId]);
+  }, [orderId, load]);
 
-  const markReady = async () => {
+  const bookDispatch = async () => {
     if (!order || isReadyPending) return;
     
     try {
       setIsReadyPending(true);
-      const updated = await ordersService.markOrderReady(order.orderId);
+      
+      // Get delivery address coordinates from order or use defaults
+      interface OrderWithDelivery extends OrderDTO {
+        deliveryLat?: number;
+        deliveryLng?: number;
+      }
+      const orderWithDelivery = order as OrderWithDelivery;
+      const deliveryAddress = {
+        latitude: orderWithDelivery.deliveryLat || 6.5244, // Use order's deliveryLat or default Lagos coordinates
+        longitude: orderWithDelivery.deliveryLng || 3.3792, // Use order's deliveryLng or default Lagos coordinates
+        address: order.deliveryAddress || 'Delivery address not specified',
+      };
+      
+      console.log('🚚 Booking dispatch with address:', deliveryAddress);
+      
+      const updated = await ordersService.bookDispatch(order.orderId, deliveryAddress);
       setOrder(updated);
-      toast.success('Order marked ready for dispatch');
-    } catch (error: any) {
-      console.error('Failed to mark order ready:', error);
-      toast.error(error?.message || 'Failed to mark order ready');
+      toast.success('Dispatch booked successfully!');
+    } catch (error: unknown) {
+      const apiError = error as { message?: string };
+      console.error('Failed to book dispatch:', error);
+      toast.error(apiError?.message || 'Failed to book dispatch');
     } finally {
       setIsReadyPending(false);
     }
@@ -103,18 +122,31 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
       await ordersService.verifyDispatchOtp(order.dispatch.id, code);
       toast.success('Delivery confirmed');
       await load(); // Refresh order
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { message?: string };
       console.error('OTP verification failed:', error);
-      toast.error(error?.message || 'OTP verification failed');
+      toast.error(apiError?.message || 'OTP verification failed');
       throw error; // Re-throw to prevent modal from closing
     }
   };
 
   const handleRedispatch = async () => {
-    await markReady();
+    if (!order) return;
+    try {
+      setIsReadyPending(true);
+      const updated = await ordersService.markOrderReady(order.orderId);
+      setOrder(updated);
+      toast.success('Order marked as prepared');
+    } catch (error: unknown) {
+      const apiError = error as { message?: string };
+      console.error('Failed to mark order prepared:', error);
+      toast.error(apiError?.message || 'Failed to mark order prepared');
+    } finally {
+      setIsReadyPending(false);
+    }
   };
 
-  const isLoading = loading && !order;
+  const isLoading = !order;
 
   return (
     <div className="space-y-6 p-2 sm:p-6">
@@ -185,7 +217,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             </CardContent>
           </Card>
 
-          {/* Patient/Recipient Information */}
+          {/* Patient/Recipient Information - ANONYMOUS: Only show MedSync ID, no names */}
           <Card>
             <CardHeader>
               <CardTitle>Recipient Information</CardTitle>
@@ -193,17 +225,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Patient ID</span>
-                <span className="font-medium">{order.patientMsid || order.patientId || '—'}</span>
+                <span className="font-medium font-mono">{order.patientMsid || order.patientId || '—'}</span>
               </div>
-              {order.receiverName && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Receiver Name</span>
-                  <span className="font-medium">{order.receiverName}</span>
-                </div>
-              )}
+              {/* REMOVED: receiverName - Pharmacy should NOT see patient names for anonymity */}
               {order.receiverPhone && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Phone</span>
+                  <span className="text-muted-foreground">Contact Phone</span>
                   <span className="font-medium">{order.receiverPhone}</span>
                 </div>
               )}
@@ -224,13 +251,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             <CardContent>
               {order.items && order.items.length > 0 ? (
                 <div className="space-y-4">
-                  {order.items.map((item: any, index: number) => (
+                  {order.items.map((item: OrderItem, index: number) => (
                     <div key={index} className="border-b last:border-0 pb-4 last:pb-0">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <p className="font-medium">{item.drugName}</p>
                           <p className="text-sm text-muted-foreground">{item.dosageSig}</p>
-                          <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Quantity: {item.quantity} {item.unit || 'tablets'}
+                          </p>
                         </div>
                         <p className="font-medium">₦{Number(item.priceNgn || 0).toLocaleString()}</p>
                       </div>
@@ -249,7 +278,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <p className="text-sm font-semibold">
-                        {order.itemsCount ? `${order.itemsCount} medications` : order.quantity ? `${order.quantity} units` : '—'}
+                        {order.items && order.items.length > 0 ? `${order.items.length} medications` : order.quantity ? `${order.quantity} units` : '—'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {order.drugName || 'Multiple medications - see items'}
@@ -293,9 +322,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                     const updated = await ordersService.markOrderReady(order.orderId);
                     setOrder(updated);
                     toast.success('Order marked as prepared');
-                  } catch (error: any) {
+                  } catch (error: unknown) {
+                    const apiError = error as { message?: string };
                     console.error('Failed to mark order prepared:', error);
-                    toast.error(error?.message || 'Failed to mark order prepared');
+                    toast.error(apiError?.message || 'Failed to mark order prepared');
                   } finally {
                     setIsReadyPending(false);
                   }
@@ -304,35 +334,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                 </Button>
               )}
 
-              {/* Mark Ready for Dispatch - PREPARED + Paid → Ready for Dispatch */}
+              {/* Book Dispatch - DISPENSED (paid) → Book Dispatch */}
               {(() => {
-                const isPrepared = order.orderStatus === 'PREPARED';
+                const isDispensed = order.orderStatus === 'DISPENSED';
                 const isPaid = order.paymentStatus === 'success' || order.paymentStatus === 'Paid' || order.paymentStatus === 'completed';
-                const notBooked = order.dispatchStatus !== 'BOOKED';
+                const notBooked = !order.dispatchStatus || (order.dispatchStatus !== 'BOOKED' && order.dispatchStatus !== 'ASSIGNED' && order.dispatchStatus !== 'PICKED_UP' && order.dispatchStatus !== 'IN_TRANSIT' && order.dispatchStatus !== 'DELIVERED');
                 
                 console.log('🚚 Dispatch button check:', {
                   orderStatus: order.orderStatus,
-                  isPrepared,
+                  isDispensed,
                   paymentStatus: order.paymentStatus,
                   isPaid,
                   dispatchStatus: order.dispatchStatus,
                   notBooked,
-                  shouldShow: isPrepared && isPaid && notBooked
+                  shouldShow: isDispensed && isPaid && notBooked
                 });
                 
-                return isPrepared && isPaid && notBooked ? (
-                <Button onClick={markReady} disabled={isReadyPending}>
+                return isDispensed && isPaid && notBooked ? (
+                <Button onClick={bookDispatch} disabled={isReadyPending}>
                     📦 Book Dispatch
                 </Button>
                 ) : null;
               })()}
 
-              {/* OTP Verification */}
-              {order.dispatchStatus === 'IN_TRANSIT' && (
-                <Button variant="outline" onClick={() => setOtpOpen(true)}>
-                  Confirm Delivery (OTP)
-                </Button>
-              )}
+              {/* OTP Verification - REMOVED - Only patients can confirm delivery */}
 
               {/* Re-dispatch */}
               {(order.dispatchStatus === 'FAILED' || order.dispatchStatus === 'CANCELED') && (
@@ -349,8 +374,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                       await ordersService.cancelDispatch(order.orderId);
                       toast.success('Dispatch cancelled');
                       await load();
-                    } catch (error: any) {
-                      toast.error(error?.message || 'Failed to cancel dispatch');
+                    } catch (error: unknown) {
+                      const apiError = error as { message?: string };
+                      toast.error(apiError?.message || 'Failed to cancel dispatch');
                     }
                   }
                 }}>
@@ -364,7 +390,115 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             <OrderTimeline events={order.events} />
           )}
 
-          {order.dispatch && (
+          {/* Delivery Tracking - For active deliveries */}
+          {isActiveDelivery && deliveryData && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
+                  🚚 Delivery Tracking
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Status Badge */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Status:</span>
+                  <Badge className={
+                    deliveryData.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                    deliveryData.status === 'IN_TRANSIT' ? 'bg-purple-100 text-purple-800' :
+                    deliveryData.status === 'PICKED_UP' ? 'bg-indigo-100 text-indigo-800' :
+                    deliveryData.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
+                  }>
+                    {deliveryData.status?.replace('_', ' ') || 'Pending'}
+                  </Badge>
+                </div>
+
+                {/* Driver Information */}
+                {deliveryData.driver && (
+                  <div className="space-y-2 border-t pt-4">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <User className="h-4 w-4" />
+                      Driver Details
+                    </div>
+                    <div className="pl-6 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Name:</span>
+                        <span className="text-sm font-medium">{deliveryData.driver.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Phone:</span>
+                        <a href={`tel:${deliveryData.driver.phone}`} className="text-sm text-primary hover:underline">
+                          {deliveryData.driver.phone}
+                        </a>
+                      </div>
+                      {deliveryData.driver.vehicleType && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Vehicle:</span>
+                          <span className="text-sm">{deliveryData.driver.vehicleType}</span>
+                        </div>
+                      )}
+                      {deliveryData.driver.vehicleNumber && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Plate:</span>
+                          <span className="text-sm font-mono">{deliveryData.driver.vehicleNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ETA */}
+                {deliveryData.estimatedArrival && (
+                  <div className="flex items-center justify-between border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Estimated Arrival:</span>
+                    </div>
+                    <span className="text-sm">{new Date(deliveryData.estimatedArrival).toLocaleString()}</span>
+                  </div>
+                )}
+
+                {/* Tracking URL */}
+                {deliveryData.trackingUrl && (
+                  <div className="border-t pt-4">
+                    <a 
+                      href={deliveryData.trackingUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      View Live Tracking →
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* OTP Confirmation - For DELIVERED orders */}
+          {orderStatus === 'DELIVERED' && order.dispatch && (order.dispatch as OrderDispatch & { otp?: string })?.otp && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Delivery Confirmation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Order has been delivered. Verify delivery with OTP:
+                  </p>
+                  {/* OTP removed - Only patients can view/confirm delivery */}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Basic Dispatch Details - For non-active deliveries */}
+          {order.dispatch && !isActiveDelivery && orderStatus !== 'DELIVERED' && (
             <Card>
               <CardHeader>
                 <CardTitle>Dispatch Details</CardTitle>
@@ -413,7 +547,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
               <div className="max-h-[60vh] overflow-y-auto space-y-4">
                 {order?.items && order.items.length > 0 ? (
                   <>
-                    {order.items.map((item: any, index: number) => (
+                    {order.items.map((item, index: number) => (
                       <div key={index} className="border rounded-lg p-4 space-y-2">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
@@ -423,7 +557,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                             )}
                             <div className="flex gap-4 mt-2 text-sm">
                               <span className="text-muted-foreground">
-                                Quantity: <span className="font-medium">{item.quantity}</span>
+                                Quantity: <span className="font-medium">{item.quantity} {item.unit || 'tablets'}</span>
                               </span>
                               {item.drugId && (
                                 <span className="text-muted-foreground">
