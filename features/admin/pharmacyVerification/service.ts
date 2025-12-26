@@ -95,8 +95,32 @@ export const pharmacyVerificationService = {
   },
 
   async getEvents(pharmacyId: string): Promise<VerificationEvent[]> {
-    const response = await api.get(`/admin/pharmacies/${pharmacyId}/events`);
-    return response.data?.data ?? response.data ?? [];
+    console.log('🔍 Fetching pharmacy events:', { pharmacyId });
+
+    // Check if we have an auth token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const user = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+
+    console.log('🔑 Auth status:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token?.substring(0, 20) + '...',
+      user: user ? JSON.parse(user) : null
+    });
+
+    try {
+      const response = await api.get(`/admin/pharmacies/${pharmacyId}/events`);
+      console.log('✅ Events fetched successfully:', response.data);
+      return response.data?.data ?? response.data ?? [];
+    } catch (error: any) {
+      console.error('❌ Failed to fetch events:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        error: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
   },
 
   async updateStatus(pharmacyId: string, status: 'pending' | 'approved' | 'rejected', notes?: string) {

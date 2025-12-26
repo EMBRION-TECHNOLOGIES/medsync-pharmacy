@@ -17,6 +17,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -85,6 +94,9 @@ export default function PharmacyVerificationPage() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectingPharmacyId, setRejectingPharmacyId] = useState<string | null>(null);
+  const [rejectionNotes, setRejectionNotes] = useState('');
 
   const queryParams = useMemo(
     () => ({
@@ -139,20 +151,45 @@ export default function PharmacyVerificationPage() {
     pharmacyId: string,
     nextStatus: 'approved' | 'rejected'
   ) => {
-    let notes: string | undefined;
-
     if (nextStatus === 'rejected') {
-      notes = window.prompt('Add rejection notes (optional)') || undefined;
+      // Show rejection dialog instead of window.prompt
+      setRejectingPharmacyId(pharmacyId);
+      setRejectionNotes('');
+      setShowRejectDialog(true);
+      return;
     }
 
+    // For approval, proceed immediately
     toast.promise(
-      updateStatus.mutateAsync({ pharmacyId, status: nextStatus, notes }),
+      updateStatus.mutateAsync({ pharmacyId, status: nextStatus, notes: undefined }),
       {
         loading: 'Updating verification status…',
         success: 'Verification status updated.',
         error: 'Failed to update verification status.',
       }
     );
+  };
+
+  const handleConfirmReject = () => {
+    if (!rejectingPharmacyId) return;
+
+    setShowRejectDialog(false);
+    toast.promise(
+      updateStatus.mutateAsync({
+        pharmacyId: rejectingPharmacyId,
+        status: 'rejected',
+        notes: rejectionNotes.trim() || undefined,
+      }),
+      {
+        loading: 'Rejecting pharmacy…',
+        success: 'Pharmacy rejected.',
+        error: 'Failed to reject pharmacy.',
+      }
+    );
+
+    // Reset state
+    setRejectingPharmacyId(null);
+    setRejectionNotes('');
   };
 
   return (
@@ -416,6 +453,55 @@ export default function PharmacyVerificationPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Rejection Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Pharmacy</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this pharmacy application. This will be sent to the pharmacy owner.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="rejection-notes" className="text-sm font-medium">
+                Rejection Notes
+              </label>
+              <Textarea
+                id="rejection-notes"
+                placeholder="Enter reason for rejection (optional)..."
+                value={rejectionNotes}
+                onChange={(e) => setRejectionNotes(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowRejectDialog(false);
+                setRejectingPharmacyId(null);
+                setRejectionNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmReject}
+            >
+              Reject Pharmacy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </RoleGuard>
   );
