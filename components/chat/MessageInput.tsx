@@ -92,10 +92,10 @@ export function MessageInput({ onSend, disabled, onQuickAction, roomId, onTyping
   ];
 
   return (
-    <div className="border-t">
+    <div className="border-t bg-background">
       {/* Quick Actions */}
-      <div className="p-3 border-b bg-muted/20">
-        <div className="flex gap-2">
+      <div className="p-2 sm:p-3 border-b bg-muted/20">
+        <div className="flex gap-1 sm:gap-2 flex-wrap">
           {/* Order Creation */}
           {roomId && (
             <OrderForm 
@@ -111,18 +111,18 @@ export function MessageInput({ onSend, disabled, onQuickAction, roomId, onTyping
               variant="ghost"
               size="sm"
               onClick={() => onQuickAction?.(action.action)}
-              className={`flex items-center gap-2 ${action.color}`}
+              className={`flex items-center gap-1 sm:gap-2 ${action.color} touch-manipulation min-h-[36px]`}
               disabled={disabled}
             >
               <action.icon className="h-4 w-4" />
-              <span className="text-xs">{action.label}</span>
+              <span className="text-xs hidden sm:inline">{action.label}</span>
             </Button>
           ))}
         </div>
       </div>
 
       {/* Message Input */}
-      <form onSubmit={handleSubmit} className="p-4">
+      <form onSubmit={handleSubmit} className="p-2 sm:p-4">
         <div className="flex gap-2">
           <Textarea
             value={message}
@@ -130,18 +130,18 @@ export function MessageInput({ onSend, disabled, onQuickAction, roomId, onTyping
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
             disabled={disabled}
-            className="min-h-[60px] resize-none"
+            className="min-h-[50px] sm:min-h-[60px] resize-none text-sm sm:text-base"
           />
           <Button
             type="submit"
             disabled={!message.trim() || disabled}
-            className="bg-ms-green hover:bg-ms-green/90"
+            className="bg-ms-green hover:bg-ms-green/90 shrink-0 min-h-[50px] sm:min-h-[60px] touch-manipulation"
             size="icon"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">
           Press Enter to send, Shift+Enter for new line
         </p>
       </form>

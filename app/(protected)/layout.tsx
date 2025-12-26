@@ -134,7 +134,7 @@ export default function ProtectedLayout({
 
       <div className="lg:pl-64">
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="py-6 px-4 sm:px-6 lg:px-8">
+        <main className="py-4 sm:py-6 px-2 sm:px-4 lg:px-8">
           {isAwaitingVerification && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
               <div className="flex flex-col gap-2">

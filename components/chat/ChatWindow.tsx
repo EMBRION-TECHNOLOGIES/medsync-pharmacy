@@ -95,9 +95,10 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
               setOcrImageUrl('/api/placeholder/400/300'); // Mock image URL
               setShowOCRPreview(true);
             }}
+            className="touch-manipulation min-h-[36px]"
           >
             <Eye className="h-4 w-4 mr-2" />
-            Review with OCR
+            <span className="text-xs sm:text-sm">Review with OCR</span>
           </Button>
         </div>
       );
@@ -271,8 +272,8 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
         const dispatchId = orderData.dispatchId;
         
         return (
-          <div className="w-full max-w-sm">
-            <div className={cn("rounded-lg p-4 space-y-2.5", config.bgColor, config.textColor)}>
+          <div className="w-full max-w-sm sm:max-w-md">
+            <div className={cn("rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-2.5", config.bgColor, config.textColor)}>
               {/* Header with icon and status */}
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{config.icon}</span>
@@ -289,9 +290,9 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
                 <button 
                   onClick={() => window.location.href = `/orders/${orderData.orderId}`}
                   className={cn(
-                    "w-full mt-2 px-4 py-2 rounded-md font-medium transition-colors",
-                    "bg-white/20 hover:bg-white/30 dark:bg-black/20 dark:hover:bg-black/30",
-                    "border border-current/20 hover:border-current/40",
+                    "w-full mt-2 px-4 py-2.5 rounded-md font-medium transition-colors touch-manipulation",
+                    "bg-white/20 active:bg-white/30 dark:bg-black/20 dark:active:bg-black/30",
+                    "border border-current/20 active:border-current/40",
                     config.textColor
                   )}
                 >
@@ -300,7 +301,7 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
               ) : (
                 <button 
                   onClick={() => window.location.href = `/orders/${orderData.orderId}`}
-                  className={cn("text-sm font-medium hover:underline", config.accentColor)}
+                  className={cn("text-sm font-medium active:underline touch-manipulation py-1", config.accentColor)}
                 >
                   View Full Details →
                 </button>
@@ -319,7 +320,7 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
 
   if (showOCRPreview) {
     return (
-      <div className="h-[calc(100vh-300px)] overflow-y-auto p-4">
+      <div className="h-[calc(100vh-200px)] sm:h-[calc(100vh-300px)] overflow-y-auto p-2 sm:p-4">
         <OCRPreview
           imageUrl={ocrImageUrl}
           onAccept={handleAcceptOCR}
@@ -334,12 +335,12 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-300px)] text-muted-foreground">
-        <div className="text-center space-y-4">
-          <MessageSquare className="h-16 w-16 mx-auto opacity-50" />
-          <p>No messages yet</p>
-          <p className="text-sm">Start the conversation</p>
-          <div className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-center h-[calc(100vh-200px)] sm:h-[calc(100vh-300px)] text-muted-foreground p-4">
+        <div className="text-center space-y-3 sm:space-y-4">
+          <MessageSquare className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-50" />
+          <p className="text-sm sm:text-base">No messages yet</p>
+          <p className="text-xs sm:text-sm">Start the conversation</p>
+          <div className="text-xs sm:text-sm text-muted-foreground">
             Patient messages are processed automatically by the backend
           </div>
         </div>
@@ -415,9 +416,9 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
   return (
     <div 
       ref={scrollRef} 
-      className="h-[calc(100vh-300px)] overflow-y-auto p-4"
+      className="h-[calc(100vh-200px)] sm:h-[calc(100vh-300px)] overflow-y-auto p-2 sm:p-4"
     >
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {sortedMessages.map((message: any, index: number) => {
           // Infer sender type if undefined (backend issue)
           // Check if message has userId or senderId, and if it matches current user
@@ -507,7 +508,7 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
                   <div className={cn('flex flex-col w-full', isPharmacy ? 'items-end' : 'items-start')}>
                     <div
                       className={cn(
-                        'rounded-lg px-4 py-2 max-w-[85%] md:max-w-[80%] lg:max-w-[70%] wrap-break-word inline-block',
+                        'rounded-lg px-3 py-2 sm:px-4 sm:py-2 max-w-[85%] sm:max-w-[80%] lg:max-w-[70%] wrap-break-word inline-block text-sm sm:text-base',
                         isPharmacy
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted'
@@ -515,7 +516,7 @@ export function ChatWindow({ messages, patientId }: ChatWindowProps) {
                     >
                       {renderMessageContent(message)}
                     </div>
-                    <span className="text-xs text-muted-foreground mt-1">
+                    <span className="text-xs text-muted-foreground mt-1 px-1">
                       {format(new Date(message.createdAt), 'HH:mm')}
                     </span>
                   </div>

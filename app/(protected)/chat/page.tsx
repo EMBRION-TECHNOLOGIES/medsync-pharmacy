@@ -16,6 +16,7 @@ export default function ChatPage() {
   const { pharmacyId, locationId } = useOrg();
   const searchParams = useSearchParams();
   const [selectedThread, setSelectedThread] = useState<ChatRoom | null>(null);
+  const [showThreadList, setShowThreadList] = useState(true); // Mobile: show thread list by default
 
   const { data: chatOrdersData, isLoading: threadsLoading, error, isError, refetch: refetchChatOrders } = useChatOrders({
     status: 'all',
@@ -85,26 +86,39 @@ export default function ChatPage() {
       const thread = chatRooms.find(r => r.id === roomId);
       if (thread) {
         setSelectedThread(thread);
+        setShowThreadList(false); // Hide thread list on mobile when thread is selected
       }
     }
   }, [searchParams, chatRooms]);
 
+  // Handle thread selection - hide thread list on mobile
+  const handleSelectThread = (thread: ChatRoom) => {
+    setSelectedThread(thread);
+    setShowThreadList(false); // Hide thread list on mobile
+  };
+
+  // Handle back to thread list on mobile
+  const handleBackToThreads = () => {
+    setShowThreadList(true);
+    setSelectedThread(null);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Chat</h1>
-        <p className="text-muted-foreground">
+      <div className="px-2 sm:px-0">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Chat</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Communicate with patients
         </p>
       </div>
 
       {/* Chat Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
-        {/* Thread List */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg">Conversations</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Thread List - Hidden on mobile when thread is selected */}
+        <Card className={`lg:col-span-1 ${showThreadList ? 'block' : 'hidden lg:block'}`}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base sm:text-lg">Conversations</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {threadsLoading ? (
@@ -115,27 +129,39 @@ export default function ChatPage() {
               <ThreadList
                 threads={chatRooms || []}
                 selectedThreadId={selectedThread?.id}
-                onSelectThread={setSelectedThread}
+                onSelectThread={handleSelectThread}
               />
             )}
           </CardContent>
         </Card>
 
-        {/* Chat Window */}
-        <Card className="lg:col-span-2 flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              {selectedThread ? (
-                <span className="font-mono text-sm">
-                  {selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.name ?? 'Unknown Patient'}
-                </span>
-              ) : (
-                'Select a conversation'
-              )}
-            </CardTitle>
+        {/* Chat Window - Full width on mobile when thread is selected */}
+        <Card className={`${showThreadList ? 'hidden lg:flex lg:col-span-2' : 'flex lg:col-span-2'} flex-col`}>
+          <CardHeader className="pb-3">
+            {/* Mobile back button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBackToThreads}
+                className="lg:hidden p-2 -ml-2 rounded-md hover:bg-muted transition-colors"
+                aria-label="Back to conversations"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <CardTitle className="text-base sm:text-lg flex items-center gap-2 flex-1">
+                <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
+                {selectedThread ? (
+                  <span className="font-mono text-xs sm:text-sm truncate">
+                    {selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.name ?? 'Unknown Patient'}
+                  </span>
+                ) : (
+                  'Select a conversation'
+                )}
+              </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent className="flex-1 p-0 flex flex-col">
+          <CardContent className="flex-1 p-0 flex flex-col min-h-0">
             {selectedThread ? (
               <>
                 <ChatWindow 
@@ -143,7 +169,7 @@ export default function ChatPage() {
                   patientAlias={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
                   threadId={selectedThread.id}
                   patientId={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
-        />
+                />
                 <MessageInput
                   onSend={handleSendMessage}
                   disabled={sendMessage.isPending}
@@ -154,10 +180,10 @@ export default function ChatPage() {
                 />
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="flex items-center justify-center h-full text-muted-foreground p-4">
                 <div className="text-center">
-                  <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p>Select a conversation to start chatting</p>
+                  <MessageSquare className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm sm:text-base">Select a conversation to start chatting</p>
                 </div>
               </div>
             )}
