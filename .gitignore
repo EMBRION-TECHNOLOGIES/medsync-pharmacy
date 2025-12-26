@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ============================================
+# BLOCK ALL MARKDOWN FILES (LOCAL DOCS ONLY)
+# ============================================
+*.md
+!README.md
+# Allow only README.md, block everything else
