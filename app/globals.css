@@ -50,7 +50,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   
-  /* MedSync Brand Colors */
+  /* TeraSync Brand Colors */
   --color-ms-blue: #0094FF;
   --color-ms-blue-light: #4DB8FF;
   --color-ms-blue-dark: #0073CC;
@@ -68,7 +68,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  /* Primary: MedSync Blue */
+  /* Primary: TeraSync Blue */
   --primary: oklch(0.618 0.164 243.018); /* #0094FF */
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.97 0 0);
@@ -80,15 +80,15 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.618 0.164 243.018); /* MedSync Blue for focus */
-  --chart-1: oklch(0.618 0.164 243.018); /* MedSync Blue */
-  --chart-2: oklch(0.691 0.13 156.894); /* MedSync Green */
-  --chart-3: oklch(0.846 0.13 89.872); /* MedSync Yellow */
+  --ring: oklch(0.618 0.164 243.018); /* TeraSync Blue for focus */
+  --chart-1: oklch(0.618 0.164 243.018); /* TeraSync Blue */
+  --chart-2: oklch(0.691 0.13 156.894); /* TeraSync Green */
+  --chart-3: oklch(0.846 0.13 89.872); /* TeraSync Yellow */
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.618 0.164 243.018); /* MedSync Blue */
+  --sidebar-primary: oklch(0.618 0.164 243.018); /* TeraSync Blue */
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -103,7 +103,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.722 0.14 243.018); /* Lighter MedSync Blue for dark mode */
+  --primary: oklch(0.722 0.14 243.018); /* Lighter TeraSync Blue for dark mode */
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -115,9 +115,9 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.722 0.14 243.018);
-  --chart-1: oklch(0.722 0.14 243.018); /* Lighter MedSync Blue */
-  --chart-2: oklch(0.746 0.11 156.894); /* Lighter MedSync Green */
-  --chart-3: oklch(0.876 0.11 89.872); /* Lighter MedSync Yellow */
+  --chart-1: oklch(0.722 0.14 243.018); /* Lighter TeraSync Blue */
+  --chart-2: oklch(0.746 0.11 156.894); /* Lighter TeraSync Green */
+  --chart-3: oklch(0.876 0.11 89.872); /* Lighter TeraSync Yellow */
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0 0);

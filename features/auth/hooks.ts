@@ -80,7 +80,7 @@ export const useLogin = () => {
       if (!allowedRoles.includes(userRole)) {
         // BLOCK non-pharmacy users
         const errorMessage = userRole === 'PATIENT'
-          ? '❌ Access Denied\n\nThis portal is for pharmacy staff only.\n\nPatients should use the MedSync mobile app.'
+          ? '❌ Access Denied\n\nThis portal is for pharmacy staff only.\n\nPatients should use the TeraSync mobile app.'
           : '❌ Access Denied\n\nThis portal is for pharmacy staff only.';
         
         console.error('Platform access denied:', userRole);

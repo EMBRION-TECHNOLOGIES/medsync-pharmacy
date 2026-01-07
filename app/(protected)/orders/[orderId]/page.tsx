@@ -217,7 +217,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             </CardContent>
           </Card>
 
-          {/* Patient/Recipient Information - ANONYMOUS: Only show MedSync ID, no names */}
+          {/* Patient/Recipient Information - ANONYMOUS: Only show TeraSync ID, no names */}
           <Card>
             <CardHeader>
               <CardTitle>Recipient Information</CardTitle>

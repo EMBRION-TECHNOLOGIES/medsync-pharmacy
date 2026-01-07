@@ -167,7 +167,7 @@ export const ordersService = {
         priceNgn: order.priceNgn,
         items: order.items, // ✅ Map items array
         patientId: order.patientId,
-        patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient MedSync ID
+        patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient TeraSync ID
       };
       }) : [];
       
@@ -207,7 +207,7 @@ export const ordersService = {
           events: order.events || [],
           items: order.items, // ✅ Map items array
           patientId: order.patientId,
-          patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient MedSync ID
+          patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient TeraSync ID
         })) : [];
         
         return {

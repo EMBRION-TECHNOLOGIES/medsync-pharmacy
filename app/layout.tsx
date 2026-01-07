@@ -10,8 +10,8 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "MedSync Pharmacy Portal",
-  description: "Manage your pharmacy operations with MedSync",
+  title: "TeraSync Pharmacy Portal",
+  description: "Manage your pharmacy operations with TeraSync",
 };
 
 export default function RootLayout({

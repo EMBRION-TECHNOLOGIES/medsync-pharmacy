@@ -11,7 +11,7 @@ const resolvedBaseUrl =
 
 if (!resolvedBaseUrl) {
   console.warn(
-    '[MedSync] NEXT_PUBLIC_API_BASE_URL is not set. API calls may fail until it is configured.'
+    '[TeraSync] NEXT_PUBLIC_API_BASE_URL is not set. API calls may fail until it is configured.'
   );
 }
 

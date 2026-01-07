@@ -32,7 +32,7 @@ export default function LoginPage() {
     try {
       await login.mutateAsync(data);
       toast.success('Login successful!', {
-        description: 'Welcome back to MedSync Pharmacy Portal',
+        description: 'Welcome back to TeraSync Pharmacy Portal',
       });
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -64,11 +64,12 @@ export default function LoginPage() {
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <Image
-              src="/medsync_logo.svg"
-              alt="MedSync Logo"
+              src="/terasync_logo.png"
+              alt="TeraSync Logo"
               width={150}
               height={50}
               priority
+              className="rounded-md"
             />
           </div>
           <CardTitle className="text-2xl font-bold">Pharmacy Portal</CardTitle>

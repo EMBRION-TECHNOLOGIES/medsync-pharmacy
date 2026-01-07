@@ -44,7 +44,7 @@ export default function SignupPage() {
   const selectedRole = 'PHARMACY_OWNER' as const;
   const register = useRegister();
   const router = useRouter();
-  const verificationEmail = 'admin@medsync.ng';
+  const verificationEmail = 'admin@terasync.ng';
   
   const {
     register: registerField,
@@ -353,11 +353,12 @@ export default function SignupPage() {
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <Image
-              src="/medsync_logo.svg"
-              alt="MedSync Logo"
+              src="/terasync_logo.png"
+              alt="TeraSync Logo"
               width={150}
               height={50}
               priority
+              className="rounded-md"
             />
           </div>
           <CardTitle className="text-2xl font-bold">Complete Pharmacy Registration</CardTitle>

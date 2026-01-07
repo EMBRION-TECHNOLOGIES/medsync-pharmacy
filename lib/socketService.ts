@@ -57,7 +57,7 @@ export class SocketService {
     const s = this.socket;
 
     s.on('connect', () => {
-      console.log('✅✅✅ CONNECTED to MedSync socket server', NAMESPACE);
+      console.log('✅✅✅ CONNECTED to TeraSync socket server', NAMESPACE);
       console.log('Socket ID:', s.id);
       console.log('Calling onConnect handler...');
       this.handlers.onConnect?.();
@@ -65,7 +65,7 @@ export class SocketService {
     });
 
     s.on('disconnect', () => {
-      console.log('Disconnected from MedSync socket server');
+      console.log('Disconnected from TeraSync socket server');
       this.handlers.onDisconnect?.();
     });
 

@@ -80,7 +80,7 @@ export function OrdersTable({ orders, onViewOrder }: OrdersTableProps) {
                 fullOrder: order
               });
               
-              // Smart patient display - prioritize MedSync ID
+              // Smart patient display - prioritize TeraSync ID
               const patientDisplay = order.patientMsid || 
                                     order.patientAlias || 
                                     (order.patientId ? `MD-${order.patientId.slice(-8).toUpperCase()}` : 'Unknown');

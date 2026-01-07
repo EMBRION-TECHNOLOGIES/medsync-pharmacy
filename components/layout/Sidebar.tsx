@@ -44,12 +44,12 @@ export function Sidebar() {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-border bg-card px-6 pb-4">
         <div className="flex h-16 shrink-0 items-center mt-4 mb-12">
           <Image
-            src="/medsync_logo.svg"
-            alt="MedSync"
+            src="/terasync_logo.png"
+            alt="TeraSync"
             width={120}
             height={40}
             priority
-            // style={{ width: "auto", height: "auto" }}
+            className="rounded-md"
           />
         </div>
         <nav className="flex flex-1 flex-col">
