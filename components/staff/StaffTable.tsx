@@ -19,16 +19,24 @@ interface StaffTableProps {
 
 const roleColors = {
   PHARMACY_OWNER: 'bg-purple-100 text-purple-800',
+  SUPERINTENDENT_PHARMACIST: 'bg-blue-100 text-blue-800',
+  SUPERVISING_PHARMACIST: 'bg-green-100 text-green-800',
+  STAFF: 'bg-gray-100 text-gray-800',
+  // Legacy support
   PHARMACIST: 'bg-blue-100 text-blue-800',
-  ADMIN: 'bg-purple-100 text-purple-800', // Legacy support
+  ADMIN: 'bg-purple-100 text-purple-800',
   DISPATCH: 'bg-green-100 text-green-800',
   VIEWER: 'bg-gray-100 text-gray-800',
 };
 
 const roleLabels = {
   PHARMACY_OWNER: 'Pharmacy Owner',
+  SUPERINTENDENT_PHARMACIST: 'Superintendent Pharmacist',
+  SUPERVISING_PHARMACIST: 'Supervising Pharmacist',
+  STAFF: 'Staff',
+  // Legacy support
   PHARMACIST: 'Pharmacist',
-  ADMIN: 'Admin', // Legacy support
+  ADMIN: 'Admin',
   DISPATCH: 'Dispatch',
   VIEWER: 'Viewer',
 };
@@ -99,12 +107,18 @@ export function StaffTable({ staff }: StaffTableProps) {
                 </TableCell>
                 <TableCell>{member.email || member.user?.email}</TableCell>
                 <TableCell>
-                  <Badge className={roleColors[member.role as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}>
-                    {roleLabels[member.role as keyof typeof roleLabels] || member.role}
+                  <Badge className={roleColors[(member.roleType || member.role) as keyof typeof roleColors] || 'bg-gray-100 text-gray-800'}>
+                    {roleLabels[(member.roleType || member.role) as keyof typeof roleLabels] || member.roleType || member.role}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {member.location?.name || <span className="text-muted-foreground">All Locations</span>}
+                  {(() => {
+                    const location = member.location;
+                    if (!member.locationId) {
+                      return <span className="text-muted-foreground">All Locations</span>;
+                    }
+                    return member.locationName || location?.name || <span className="text-muted-foreground">Location assigned</span>;
+                  })()}
                 </TableCell>
                 <TableCell>
                   {format(new Date(member.createdAt || member.acceptedAt || new Date()), 'MMM dd, yyyy')}

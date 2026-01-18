@@ -1,6 +1,6 @@
-# MedSync Pharmacy Portal
+# TeraSync Pharmacy Portal
 
-A production-ready pharmacy management web application built with Next.js 14, TypeScript, and modern web technologies. This portal connects to the MedSync backend API to provide comprehensive pharmacy operations management.
+A production-ready pharmacy management web application built with Next.js 14, TypeScript, and modern web technologies. This portal connects to the TeraSync backend API to provide comprehensive pharmacy operations management.
 
 ## Features
 
@@ -31,7 +31,7 @@ A production-ready pharmacy management web application built with Next.js 14, Ty
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Access to MedSync backend API
+- Access to TeraSync backend API
 - Backend API URL and Socket URL
 
 ### Installation
@@ -39,7 +39,7 @@ A production-ready pharmacy management web application built with Next.js 14, Ty
 1. Clone the repository or navigate to the project directory:
 
 ```bash
-cd medsync-pharmacy
+cd terasync-pharmacy
 ```
 
 2. Install dependencies:
@@ -101,7 +101,7 @@ npm start
 ## Project Structure
 
 ```
-medsync-pharmacy/
+terasync-pharmacy/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/
 │   │   └── login/             # Login page
@@ -200,7 +200,7 @@ WebSocket rooms are organized by pharmacy and location:
 - JWT authentication stored in HttpOnly cookies
 - All API requests scoped to authenticated user's pharmacy
 - Role-based access control enforced on both frontend and backend
-- Patient PII hidden, using MedSync ID aliases
+- Patient PII hidden, using TeraSync ID aliases
 - Socket rooms validated server-side before joining
 
 ## Deployment
@@ -227,8 +227,8 @@ WebSocket rooms are organized by pharmacy and location:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL | `https://api.medsync.com/api/v1` |
-| `NEXT_PUBLIC_SOCKET_URL` | WebSocket server URL | `https://api.medsync.com` |
+| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL | `https://api.terasync.com/api/v1` |
+| `NEXT_PUBLIC_SOCKET_URL` | WebSocket server URL | `https://api.terasync.com` |
 | `NODE_ENV` | Environment | `development` or `production` |
 
 ## Troubleshooting
@@ -265,8 +265,8 @@ Ensure:
 
 ## License
 
-Proprietary - MedSync Technologies
+Proprietary - TeraSync Technologies
 
 ## Support
 
-For support, contact the MedSync development team or consult the backend API documentation.
+For support, contact the TeraSync development team or consult the backend API documentation.

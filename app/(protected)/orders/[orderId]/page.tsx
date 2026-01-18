@@ -258,7 +258,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                           <p className="font-medium">{item.drugName}</p>
                           <p className="text-sm text-muted-foreground">{item.dosageSig}</p>
                           <p className="text-sm text-muted-foreground">
-                            Quantity: {item.quantity} {item.unit || 'tablets'}
+                            Quantity: {item.quantity}
                           </p>
                         </div>
                         <p className="font-medium">₦{Number(item.priceNgn || 0).toLocaleString()}</p>
@@ -557,7 +557,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                             )}
                             <div className="flex gap-4 mt-2 text-sm">
                               <span className="text-muted-foreground">
-                                Quantity: <span className="font-medium">{item.quantity} {item.unit || 'tablets'}</span>
+                                Quantity: <span className="font-medium">{item.quantity}</span>
                               </span>
                               {item.drugId && (
                                 <span className="text-muted-foreground">

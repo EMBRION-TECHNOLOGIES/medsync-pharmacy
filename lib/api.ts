@@ -2,12 +2,29 @@ import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
 const envBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-const resolvedBaseUrl =
-  envBaseUrl && envBaseUrl.length > 0
-    ? envBaseUrl.replace(/\/$/, '')
-    : process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000/api/v1'
-      : undefined;
+
+// Function to get the base URL dynamically (handles WiFi network changes)
+function getBaseURL(): string | undefined {
+  if (envBaseUrl && envBaseUrl.length > 0) {
+    return envBaseUrl.replace(/\/$/, '');
+  }
+  
+  if (process.env.NODE_ENV === 'development') {
+    // In browser, use the same hostname as the frontend (works with any WiFi network)
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      // Use 127.0.0.1 instead of localhost for better browser compatibility
+      const apiHost = hostname === 'localhost' ? '127.0.0.1' : hostname;
+      return `http://${apiHost}:3000/api/v1`;
+    }
+    // SSR fallback
+    return 'http://127.0.0.1:3000/api/v1';
+  }
+  
+  return undefined;
+}
+
+const resolvedBaseUrl = getBaseURL();
 
 if (!resolvedBaseUrl) {
   console.warn(
@@ -25,13 +42,47 @@ export const api = axios.create({
 
 // API Base URL configured in next.config.ts
 
-// Request interceptor for adding Bearer token and idempotency key
+// Request interceptor for adding Bearer token, dynamic baseURL, and idempotency key
 api.interceptors.request.use(
   (config) => {
+    // ✅ FIX: Re-resolve baseURL on each request to handle WiFi network changes
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      const dynamicBaseURL = getBaseURL();
+      if (dynamicBaseURL) {
+        const oldBaseURL = config.baseURL;
+        config.baseURL = dynamicBaseURL;
+        // Debug: Log baseURL changes
+        if (oldBaseURL !== dynamicBaseURL) {
+          console.log(`[API] BaseURL updated: ${oldBaseURL} → ${dynamicBaseURL}`);
+        }
+      }
+    }
+
     // Add Bearer token from localStorage
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Attach org/location context headers for multi-location enforcement (backend validates)
+    if (typeof window !== 'undefined') {
+      try {
+        const rawOrg = localStorage.getItem('terasync-pharmacy-org');
+        if (rawOrg) {
+          const parsed = JSON.parse(rawOrg) as { state?: { pharmacyId?: string; locationId?: string } };
+          const pharmacyId = parsed?.state?.pharmacyId;
+          const locationId = parsed?.state?.locationId;
+
+          if (pharmacyId && String(pharmacyId).trim().length > 0) {
+            config.headers['X-Pharmacy-Id'] = String(pharmacyId).trim();
+          }
+          if (locationId && String(locationId).trim().length > 0) {
+            config.headers['X-Location-Id'] = String(locationId).trim();
+          }
+        }
+      } catch (e) {
+        // Ignore malformed storage
+      }
     }
 
     // Debug logging for API requests
@@ -42,6 +93,7 @@ api.interceptors.request.use(
         data: config.data,
         hasToken: !!token,
         headers: config.headers,
+        baseURL: config.baseURL,
         fullUrl: `${config.baseURL}${config.url}`
       });
     }
@@ -75,9 +127,16 @@ api.interceptors.response.use(
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       if (response.data.success) {
         const nestedData = response.data.data;
-        // ✅ FIX: Check for pagination at the response.data level (not nestedData)
-        // Backend returns: { success: true, data: [...], pagination: {...} }
-        const hasPagination = response.data.pagination !== undefined;
+        
+        // Check for pagination at root level: { success, data, page, pageSize, total }
+        const hasRootPagination = response.data.page !== undefined || 
+                                  response.data.pageSize !== undefined || 
+                                  response.data.total !== undefined;
+        
+        // Check for pagination object: { success, data, pagination: {...} }
+        const hasPaginationObject = response.data.pagination !== undefined;
+        
+        // Check for pagination in nested data
         const nestedHasPagination = nestedData && (
           'page' in nestedData || 
           'pageSize' in nestedData || 
@@ -87,18 +146,28 @@ api.interceptors.response.use(
           'limit' in nestedData
         );
         
-        if (hasPagination) {
-          // ✅ FIX: Return both data and pagination from response.data level
-          // Backend returns: { success: true, data: [...], pagination: {...} }
-          // Frontend expects: { data: [...], pagination: {...} }
+        if (hasRootPagination) {
+          // Backend returns: { success: true, data: [...], page: 1, pageSize: 20, total: 100 }
+          // Pass through the full response.data (without unwrapping)
           return { 
             ...response, 
             data: {
-              data: nestedData || response.data.data || [],
+              data: nestedData || [],
+              page: response.data.page || 1,
+              pageSize: response.data.pageSize || 20,
+              total: response.data.total || 0,
+            }
+          };
+        } else if (hasPaginationObject) {
+          // Backend returns: { success: true, data: [...], pagination: {...} }
+          return { 
+            ...response, 
+            data: {
+              data: nestedData || [],
               pagination: response.data.pagination || {
                 total: 0,
-                limit: Number(response.data.pagination?.limit || 10),
-                offset: Number(response.data.pagination?.offset || 0),
+                limit: 10,
+                offset: 0,
                 hasMore: false
               }
             }

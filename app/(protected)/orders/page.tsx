@@ -6,6 +6,7 @@ import { useOrg } from '@/store/useOrg';
 import { OrdersTable } from '@/components/orders/OrdersTable';
 import { OrderDetail } from '@/components/orders/OrderDetail';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -14,17 +15,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OrderStatus } from '@/lib/zod-schemas';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function OrdersPage() {
   const { pharmacyId } = useOrg();
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<OrderDTO[]>([]);
   const [total, setTotal] = useState(0);
+  
+  const totalPages = Math.ceil(total / pageSize);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
 
   const load = async () => {
     if (!pharmacyId) return;
@@ -98,12 +103,72 @@ export default function OrdersPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <OrdersTable
-          orders={orders as any}
-          onViewOrder={(o: any) => {
-            window.location.href = `/orders/${o.orderId || o.id}`;
-          }}
-        />
+        <>
+          <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+            <OrdersTable
+              orders={orders as any}
+              onViewOrder={(o: any) => {
+                window.location.href = `/orders/${o.orderId || o.id}`;
+              }}
+            />
+          </div>
+          
+          {/* Pagination */}
+          {total > 0 && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} orders
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={!hasPrevPage}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Show pages around current page
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (page <= 3) {
+                      pageNum = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = page - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={!hasNextPage}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -17,10 +17,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    // Allow production builds to succeed even if there are ESLint errors.
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     // Allow production builds to succeed even if there are type errors.
     // We will fix type issues incrementally without blocking deploys.
@@ -28,7 +24,25 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react"]
-  }
+  },
+  // Turbopack configuration (Next.js 16 default)
+  turbopack: {
+    resolveAlias: {
+      // Fix for react-web-gifted-chat: alias react-native to react-native-web
+      'react-native': 'react-native-web',
+    },
+  },
+  // Webpack configuration (fallback for --webpack flag)
+  webpack: (config, { isServer }) => {
+    // Fix for react-web-gifted-chat: alias react-native to react-native-web
+    if (!isServer) {
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        'react-native': 'react-native-web',
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

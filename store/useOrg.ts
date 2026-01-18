@@ -23,7 +23,7 @@ export const useOrg = create<OrgState>()(
       clear: () => set({ pharmacyId: undefined, locationId: undefined, pharmacyName: undefined, locationName: undefined }),
     }),
     {
-      name: 'medsync-pharmacy-org',
+      name: 'terasync-pharmacy-org',
     }
   )
 );

@@ -61,7 +61,7 @@ export const paymentService = {
       
       return {
         clientSecret: `pi_mock_${Date.now()}`,
-        paymentUrl: `https://checkout.medsync.com/pay/${orderId}`,
+        paymentUrl: `https://checkout.terasync.com/pay/${orderId}`,
       };
     }
     

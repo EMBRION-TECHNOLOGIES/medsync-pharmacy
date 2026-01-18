@@ -81,7 +81,9 @@ export default function ChatPage() {
 
   // Auto-select thread from URL params
   useEffect(() => {
-    const roomId = searchParams.get('roomId');
+    // useSearchParams() returns a ReadonlyURLSearchParams object, not a Promise
+    // Accessing .get() is safe in client components
+    const roomId = searchParams?.get('roomId');
     if (roomId && chatRooms.length > 0) {
       const thread = chatRooms.find(r => r.id === roomId);
       if (thread) {
@@ -163,22 +165,16 @@ export default function ChatPage() {
           </CardHeader>
           <CardContent className="flex-1 p-0 flex flex-col min-h-0">
             {selectedThread ? (
-              <>
-                <ChatWindow 
-                  messages={messages?.messages || []} 
-                  patientAlias={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
-                  threadId={selectedThread.id}
-                  patientId={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
-                />
-                <MessageInput
-                  onSend={handleSendMessage}
-                  disabled={sendMessage.isPending}
-                  onQuickAction={handleQuickAction}
-                  roomId={selectedThread.id}
-                  onTyping={handleTyping}
-                  onOrderCreated={handleOrderCreated}
-                />
-              </>
+              <ChatWindow 
+                messages={messages?.messages || []} 
+                patientAlias={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
+                threadId={selectedThread.id}
+                patientId={selectedThread.participants.find(p => p.type === 'PATIENT' || p.type === 'patient')?.id ?? 'Unknown'}
+                onSend={handleSendMessage}
+                roomId={selectedThread.id}
+                onQuickAction={handleQuickAction}
+                onOrderCreated={handleOrderCreated}
+              />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground p-4">
                 <div className="text-center">

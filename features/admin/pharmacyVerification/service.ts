@@ -1,5 +1,10 @@
 import { api } from '@/lib/api';
 
+export interface AdminVerificationItem {
+  verified: boolean;
+  verifiedAt: string | null;
+}
+
 export interface AdminPharmacyRecord {
   id: string;
   name: string;
@@ -10,6 +15,8 @@ export interface AdminPharmacyRecord {
   verificationStatus: string;
   verificationNotes?: string | null;
   verifiedAt?: string | null;
+  governanceStatus?: string | null;
+  adminApproved?: boolean;
   createdAt?: string;
   owner?: {
     id: string;
@@ -18,6 +25,33 @@ export interface AdminPharmacyRecord {
     email?: string;
     phone?: string;
   } | null;
+  licenses?: {
+    pcnRegistrationNumber: string | null;
+    cacRegistrationNumber: string | null;
+    cacBusinessName: string | null;
+    nafdacLicenseNo: string | null;
+    premisesLicense: string | null;
+  };
+  adminVerification?: {
+    pcnLicense: AdminVerificationItem;
+    cacCertificate: AdminVerificationItem;
+    superintendentLicense: AdminVerificationItem;
+    premisesLicense: AdminVerificationItem;
+    nafdacLicense: AdminVerificationItem;
+    namesMatch: AdminVerificationItem;
+  };
+  governance?: {
+    hasSuperintendent: boolean;
+    superintendentCount: number;
+    hasLocations: boolean;
+    locationCount: number;
+    teamCount: number;
+    canBeApproved: boolean;
+    // Operational warnings (not blockers)
+    locationsWithoutSupervisor: number;
+    hasLocationWarnings: boolean;
+  };
+  approvalMode?: 'PRODUCTION' | 'TEST';
 }
 
 export interface AdminPharmacyListResponse {
@@ -69,10 +103,12 @@ export const pharmacyVerificationService = {
       throw new Error('Invalid API response structure');
     }
 
-    // Map pharmacyUsers to owner field
+    // Backend already returns owner field directly, no need to transform
+    // The backend endpoint formats the response with owner already set
     const pharmacies = (backendData.pharmacies || []).map((pharmacy: any) => ({
       ...pharmacy,
-      owner: pharmacy.pharmacyUsers?.[0]?.user || null
+      // owner is already set by backend, but ensure it's properly structured
+      owner: pharmacy.owner || null
     }));
 
     const transformedResponse: AdminPharmacyListResponse = {
@@ -127,6 +163,22 @@ export const pharmacyVerificationService = {
     const response = await api.patch(`/admin/pharmacies/${pharmacyId}/status`, {
       status,
       notes,
+    });
+    return response.data;
+  },
+
+  async setTestMode(pharmacyId: string, enabled: boolean, notes?: string) {
+    const response = await api.patch(`/admin/pharmacies/${pharmacyId}/test-mode`, {
+      enabled,
+      notes,
+    });
+    return response.data;
+  },
+
+  async updateComplianceItem(pharmacyId: string, item: string, verified: boolean) {
+    const response = await api.patch(`/admin/pharmacies/${pharmacyId}/compliance-item`, {
+      item,
+      verified,
     });
     return response.data;
   },

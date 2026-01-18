@@ -142,17 +142,25 @@ export const ordersService = {
     try {
       const response = await api.get(`/orders?${params}`);
       console.log('🔍 /orders API response:', response.data);
-      const orders = response.data.data || response.data;
-      console.log('🔍 Raw orders array:', orders);
+      
+      // Handle both response formats:
+      // 1. Interceptor unwrapped: { data: [...], page, pageSize, total }
+      // 2. Raw array: [...]
+      const responseData = response.data;
+      const orders = Array.isArray(responseData) ? responseData : (responseData.data || []);
+      const page = responseData.page || 1;
+      const pageSize = responseData.pageSize || 15;
+      const total = responseData.total || orders.length;
+      
+      console.log('🔍 Parsed response:', { ordersCount: orders.length, page, pageSize, total });
+      
       if (orders.length > 0) {
         console.log('🔍 First order raw data:', orders[0]);
-        console.log('🔍 First order patient data:', orders[0].patient);
         console.log('🔍 First order patientMsid:', orders[0].patientMsid);
       }
       
       // Map each order from backend format to OrderDTO
       const mappedOrders = Array.isArray(orders) ? orders.map((order: BackendOrder): OrderDTO => {
-        console.log('🔍 Mapping order:', order.id, 'patientMsid:', order.patientMsid, 'patient:', order.patient);
         return {
         orderId: order.id,
         orderCode: order.orderCode,
@@ -167,15 +175,15 @@ export const ordersService = {
         priceNgn: order.priceNgn,
         items: order.items, // ✅ Map items array
         patientId: order.patientId,
-        patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient TeraSync ID
+        patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient MedSync ID
       };
       }) : [];
       
       return {
         data: mappedOrders,
-        page: response.data.page || 1,
-        pageSize: response.data.pageSize || 10,
-        total: response.data.total || 0,
+        page,
+        pageSize,
+        total,
       };
     } catch (error: unknown) {
       const apiError = error as { response?: { status?: number } };
@@ -207,7 +215,7 @@ export const ordersService = {
           events: order.events || [],
           items: order.items, // ✅ Map items array
           patientId: order.patientId,
-          patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient TeraSync ID
+          patientMsid: order.patientMsid || order.patient?.medSyncId, // ✅ Map patient MedSync ID
         })) : [];
         
         return {

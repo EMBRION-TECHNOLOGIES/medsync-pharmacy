@@ -3,6 +3,48 @@ import { authService } from './service';
 import { LoginInput, RegisterInput, AuthUser, Tokens } from '@/lib/zod-schemas';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useOrg } from '@/store/useOrg';
+import { usePharmacyContext } from '@/store/usePharmacyContext';
+import { getDefaultPermissions } from '@/lib/permissions';
+import type { PharmacyRoleType } from '@/features/onboarding/types';
+
+/**
+ * Populate org and pharmacy context stores from auth response.
+ * Called after login and on /auth/me response.
+ */
+function populateStoresFromPharmacyContext(pharmacyContext: any) {
+  if (!pharmacyContext) return;
+
+  const orgStore = useOrg.getState();
+  const pharmacyCtxStore = usePharmacyContext.getState();
+
+  // Populate useOrg store (for X-Pharmacy-Id and X-Location-Id headers)
+  orgStore.setPharmacy(pharmacyContext.pharmacyId, pharmacyContext.pharmacyName);
+
+  // For location-scoped users, set their bound location immediately
+  // For org-scoped users, they can choose via OrgSwitcher
+  if (pharmacyContext.userLocationId) {
+    orgStore.setLocation(pharmacyContext.userLocationId, pharmacyContext.userLocationName || '');
+  } else if (pharmacyContext.isOrgScoped && pharmacyContext.locations?.length > 0) {
+    // Org-scoped user without a location - leave as "All Locations" (empty string)
+    // They can select via OrgSwitcher if they want
+  }
+
+  // ALWAYS derive permissions from roleType using frontend config
+  // Backend permissions may be incomplete/stale - frontend is source of truth for UI permissions
+  const roleType = (pharmacyContext.roleType || 'STAFF') as PharmacyRoleType;
+  const derivedPermissions = getDefaultPermissions(roleType);
+
+  // Populate usePharmacyContext store (for permissions, role, governance)
+  pharmacyCtxStore.setContext({
+    pharmacyId: pharmacyContext.pharmacyId,
+    pharmacyName: pharmacyContext.pharmacyName,
+    roleType: roleType,
+    permissions: derivedPermissions,
+    governanceStatus: pharmacyContext.governanceStatus,
+    canOperate: pharmacyContext.canOperate,
+  });
+}
 
 export const useAuth = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -17,15 +59,20 @@ export const useAuth = () => {
         queryKey: ['auth', 'me'],
         queryFn: authService.getMe,
         retry: false,
-      }).then((result) => {
+      }).then((result: any) => {
         // ✅ VALIDATE ROLE ON STARTUP
-        if (result?.data) {
-        const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER', 'ADMIN'];
-          
-          if (!allowedRoles.includes(result.data.role)) {
-            console.warn('⚠️ Non-pharmacy user detected, logging out:', result.data.role);
+        if (result) {
+          const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER', 'ADMIN'];
+
+          if (!allowedRoles.includes(result.role)) {
+            console.warn('⚠️ Non-pharmacy user detected, logging out:', result.role);
             authService.clearTokens();
             queryClient.clear();
+          } else {
+            // ✅ Populate stores with pharmacy context on app startup
+            if (result.pharmacyContext) {
+              populateStoresFromPharmacyContext(result.pharmacyContext);
+            }
           }
         }
       }).catch((error) => {
@@ -36,7 +83,7 @@ export const useAuth = () => {
     setIsInitialized(true);
   }, [queryClient]);
 
-  const { data: user, isLoading, error, refetch } = useQuery<AuthUser, Error>({
+  const { data: user, isLoading, error, refetch } = useQuery<AuthUser & { pharmacyContext?: any }, Error>({
     queryKey: ['auth', 'me'],
     queryFn: authService.getMe,
     retry: false,
@@ -44,16 +91,14 @@ export const useAuth = () => {
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
     enabled: authService.isAuthenticated() && isInitialized,
-    onError: (error) => {
-      console.error('❌ Auth error - likely backend issue:', error);
-      // If it's a backend data issue, show a user-friendly message
-      if (error.message.includes('Backend API issue')) {
-        console.error('🔧 BACKEND FIX NEEDED: /auth/me endpoint missing user data');
-        // Don't logout user, just show error in console for now
-        // The backend team needs to fix this
-      }
-    },
   });
+
+  // Populate stores whenever user data changes
+  useEffect(() => {
+    if (user?.pharmacyContext) {
+      populateStoresFromPharmacyContext(user.pharmacyContext);
+    }
+  }, [user]);
 
 
   return {
@@ -73,43 +118,48 @@ export const useLogin = () => {
     mutationFn: (credentials: LoginInput) => authService.login(credentials),
     onSuccess: async (data) => {
       const userRole = data.user.role;
-      
+
       // ✅ ENFORCE PHARMACY PORTAL ACCESS
       const allowedRoles = ['PHARMACIST', 'PHARMACY_OWNER', 'ADMIN'];
-      
+
       if (!allowedRoles.includes(userRole)) {
         // BLOCK non-pharmacy users
         const errorMessage = userRole === 'PATIENT'
           ? '❌ Access Denied\n\nThis portal is for pharmacy staff only.\n\nPatients should use the TeraSync mobile app.'
           : '❌ Access Denied\n\nThis portal is for pharmacy staff only.';
-        
+
         console.error('Platform access denied:', userRole);
-        
+
         // Clear any stored tokens
         authService.clearTokens();
-        
+
         throw new Error(errorMessage);
       }
-      
+
+      // ✅ Populate stores with pharmacy context from login response
+      if (data.pharmacyContext) {
+        populateStoresFromPharmacyContext(data.pharmacyContext);
+      }
+
       // Set initial user data from login response
       queryClient.setQueryData(['auth', 'me'], data.user);
-      
+
       // CRITICAL: Immediately refetch fresh user data to get latest verification status
-      // This ensures we have the most up-to-date verification status after login
       try {
         const freshUserData = await queryClient.fetchQuery({
           queryKey: ['auth', 'me'],
           queryFn: authService.getMe,
-          staleTime: 0, // Force fresh fetch
+          staleTime: 0,
         });
-        
-        // Update cache with fresh data (includes latest verification status)
+
+        // Re-populate stores with fresh data (in case it differs)
+        if ((freshUserData as any)?.pharmacyContext) {
+          populateStoresFromPharmacyContext((freshUserData as any).pharmacyContext);
+        }
+
         queryClient.setQueryData(['auth', 'me'], freshUserData);
-        
-        console.log('✅ Fresh user data fetched after login:', freshUserData);
       } catch (error) {
-        console.warn('⚠️ Failed to fetch fresh user data after login, using login response data:', error);
-        // Continue with login response data if refetch fails
+        console.warn('Failed to fetch fresh user data after login:', error);
       }
 
       if (userRole === 'ADMIN') {
@@ -121,9 +171,6 @@ export const useLogin = () => {
     onError: (error: any) => {
       console.error('Login error:', error);
       authService.clearTokens();
-      
-      // Error toast is handled in the login form component
-      // This ensures we don't show duplicate toasts
     },
   });
 };
@@ -159,17 +206,26 @@ export const useLogout = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const clearAllStores = () => {
+    // Clear org store (pharmacy/location selection)
+    useOrg.getState().clear();
+    // Clear pharmacy context store (role/permissions)
+    usePharmacyContext.getState().clearContext();
+  };
+
   return useMutation({
     mutationFn: authService.logout,
     onSuccess: () => {
       queryClient.clear();
       authService.clearTokens();
+      clearAllStores();
       router.push('/login');
     },
     onError: () => {
       // Even if logout API fails, clear local state
       queryClient.clear();
       authService.clearTokens();
+      clearAllStores();
       router.push('/login');
     },
   });

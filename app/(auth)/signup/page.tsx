@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
 import { pharmacyRegistrationSchema, type PharmacyRegistrationInput } from '@/lib/zod-schemas';
 import { useRegister } from '@/features/auth/hooks';
-import { pharmacyService } from '@/features/pharmacy/service';
+import { onboardingService } from '@/features/onboarding/service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -260,27 +260,38 @@ export default function SignupPage() {
       // Check if user is already authenticated (they might be completing pharmacy registration)
       const isAuthenticated = typeof window !== 'undefined' && localStorage.getItem('accessToken');
       
+      // Prepare pharmacy data for governance onboarding API
+      const pharmacyData = {
+        name: data.pharmacyName,
+        address: data.address || 'Current Location',
+        phone: data.phone || '',
+        email: data.pharmacyEmail,
+        pcnRegistrationNumber: data.licenseNumber,
+        initiatorRole: 'PHARMACY_OWNER' as const,
+      };
+      
       if (isAuthenticated) {
-        // User is already authenticated, just create the pharmacy
-        const pharmacyData = {
-          name: data.pharmacyName,
-          address: data.address || 'Current Location',
-          phone: data.phone || '',
-          email: data.pharmacyEmail,
-          licenseNumber: data.licenseNumber,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          description: data.description || '',
-        };
-        
+        // User is already authenticated, create pharmacy with governance onboarding
         try {
-          await pharmacyService.createPharmacy(pharmacyData);
-          toast.success('Pharmacy registration submitted for review.');
-          toast.info(`Email your pharmacy license and government-issued ID to ${verificationEmail} so we can verify your account.`);
-          router.push('/dashboard');
+          const result = await onboardingService.createPharmacy(pharmacyData);
+          // API interceptor unwraps response, so result.data is the unwrapped data object
+          const responseData = result.data || {};
+          const message = responseData?.message || 'Pharmacy created successfully!';
+          toast.success(message);
+          if (responseData?.remainingRoles && responseData.remainingRoles.length > 0) {
+            const roleNames = responseData.remainingRoles.map((r: { displayName?: string; roleType: string }) => r.displayName || r.roleType).join(', ');
+            toast.info(`Next step: Invite ${responseData.remainingRoles.length} required role(s) (${roleNames}) in the Pharmacy Team section.`);
+          } else {
+            toast.info('Next step: Invite required roles (Superintendent Pharmacist, Supervising Pharmacist) in the Pharmacy Team section.');
+          }
+          router.push('/pharmacy-team');
         } catch (pharmacyError: unknown) {
           console.error('Pharmacy creation failed:', pharmacyError);
-          toast.error('Pharmacy registration failed. Please try again.');
+          const response = (pharmacyError as ApiErrorResponse).response;
+          const errorMessage = response?.data?.error?.message || 
+                              response?.data?.message ||
+                              'Pharmacy registration failed. Please try again.';
+          toast.error(errorMessage);
         }
       } else {
         // User is not authenticated, register them first
@@ -296,23 +307,29 @@ export default function SignupPage() {
         // Register the user account
         await register.mutateAsync(userData);
         
-        // After user registration, create the pharmacy
-        const pharmacyData = {
-          name: data.pharmacyName,
-          address: data.address || 'Current Location',
-          phone: data.phone || '',
-          email: data.pharmacyEmail,
-          licenseNumber: data.licenseNumber,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          description: data.description || '',
-        };
-        
+        // After user registration, create the pharmacy with governance onboarding
         try {
-          await pharmacyService.createPharmacy(pharmacyData);
-          toast.success('Registration received! We will review your documents shortly.');
-          toast.info(`Next step: email your pharmacy license and valid ID to ${verificationEmail}. We will notify you once verification is complete.`);
+          const result = await onboardingService.createPharmacy(pharmacyData);
+          // API interceptor unwraps response, so result.data is the unwrapped data object
+          const responseData = result.data || {};
+          
+          // Clear any stored tokens - user should log in fresh
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+          }
+          
+          // Pharmacy created successfully - redirect to login
+          toast.success('Registration successful! Your pharmacy has been created.');
+          toast.info('Please log in to continue setting up your pharmacy.');
+          
+          if (responseData?.remainingRoles && responseData.remainingRoles.length > 0) {
+            const roleNames = responseData.remainingRoles.map((r: { displayName?: string; roleType: string }) => r.displayName || r.roleType).join(', ');
+            toast.info(`After login, invite ${responseData.remainingRoles.length} required role(s): ${roleNames}`);
+          }
+          
           router.push('/login');
+          return;
         } catch (pharmacyError: unknown) {
           console.error('Pharmacy creation failed:', pharmacyError);
           
@@ -348,7 +365,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-ms-blue/10 to-ms-green/10 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-ms-blue/10 to-ms-green/10 p-4">
       <Card className="w-full max-w-2xl overflow-visible">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
@@ -694,22 +711,20 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <Alert className="border-amber-300 bg-amber-50 text-amber-900">
-                  <AlertTitle>Manual Verification Required</AlertTitle>
+                <Alert className="border-blue-300 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100 dark:border-blue-800">
+                  <AlertTitle>Governance Onboarding Process</AlertTitle>
                   <AlertDescription className="space-y-2">
-                    <p>
-                      To activate dispensing access, email the following documents to{' '}
-                      <a className="underline font-medium" href={`mailto:${verificationEmail}`}>
-                        {verificationEmail}
-                      </a>:
-                    </p>
-                    <ul className="list-disc pl-5 space-y-1 text-sm">
-                      <li>Pharmacy Council of Nigeria (PCN) license for your pharmacy</li>
-                      <li>Valid government-issued ID for the supervising pharmacist</li>
-                      <li>Registered email and phone number so we can match your application</li>
-                    </ul>
                     <p className="text-sm">
-                      We&apos;ll confirm by email once your pharmacy is approved. Until then you can update settings and review onboarding resources inside the portal.
+                      After registration, you&apos;ll need to complete the governance onboarding process:
+                    </p>
+                    <ol className="list-decimal pl-5 space-y-1 text-sm">
+                      <li><strong>Invite Required Roles:</strong> Send invitations to Superintendent Pharmacist and Supervising Pharmacist</li>
+                      <li><strong>Role Confirmations:</strong> Each role must confirm their responsibilities via secure email link</li>
+                      <li><strong>Send Documents:</strong> After all roles confirm, email verification documents to <a className="underline font-medium" href={`mailto:${verificationEmail}`}>{verificationEmail}</a></li>
+                      <li><strong>Admin Review:</strong> Our team will review and activate your pharmacy</li>
+                    </ol>
+                    <p className="text-sm mt-2">
+                      Once all roles are confirmed, you can access the <strong>Pharmacy Team</strong> section to invite team members and track progress.
                     </p>
                   </AlertDescription>
                 </Alert>

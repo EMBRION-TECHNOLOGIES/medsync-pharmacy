@@ -1,29 +1,49 @@
 'use client';
 
 import { useAuth } from '@/features/auth/hooks';
+import { usePharmacyContext } from '@/store/usePharmacyContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { UserRole } from '@/lib/zod-schemas';
+
+// Pharmacy role types that can be checked
+type PharmacyRoleType = 'PHARMACY_OWNER' | 'SUPERINTENDENT_PHARMACIST' | 'SUPERVISING_PHARMACIST' | 'STAFF';
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  allowedRoles: (UserRole | 'ADMIN')[];
+  allowedRoles: (PharmacyRoleType | 'ADMIN')[];
   fallback?: React.ReactNode;
 }
 
+/**
+ * RoleGuard - Protects pages based on pharmacy role type
+ * 
+ * For pharmacy users, checks roleType from pharmacy context (e.g., PHARMACY_OWNER, SUPERINTENDENT_PHARMACIST)
+ * For admin users, checks user.role directly (ADMIN)
+ */
 export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const { roleType, isLoaded: contextLoaded } = usePharmacyContext();
   const router = useRouter();
 
+  // Determine if user is admin (system role)
+  const isAdmin = user?.role === 'ADMIN';
+  
+  // For pharmacy users, use roleType from context; for admins, use 'ADMIN'
+  const effectiveRole = isAdmin ? 'ADMIN' : roleType;
+  
+  // Still loading - show spinner
+  const isLoading = authLoading || (!isAdmin && !contextLoaded);
+
   useEffect(() => {
-    if (!isLoading && user) {
-      const userRole = user.role as UserRole | 'ADMIN';
-      if (!allowedRoles.includes(userRole)) {
-        // Redirect to dashboard if user doesn't have permission
-        router.push('/dashboard');
-      }
+    // Wait until loading is complete
+    if (isLoading || !user) return;
+    
+    // Check if user has permission
+    if (effectiveRole && !allowedRoles.includes(effectiveRole as PharmacyRoleType | 'ADMIN')) {
+      // Redirect to dashboard if user doesn't have permission
+      router.push('/dashboard');
     }
-  }, [user, isLoading, allowedRoles, router]);
+  }, [user, isLoading, effectiveRole, allowedRoles, router]);
 
   if (isLoading) {
     return (
@@ -46,8 +66,8 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
     );
   }
 
-  const userRole = user.role as UserRole | 'ADMIN';
-  if (!allowedRoles.includes(userRole)) {
+  // Check permission based on effective role
+  if (!effectiveRole || !allowedRoles.includes(effectiveRole as PharmacyRoleType | 'ADMIN')) {
     return fallback || (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="text-center">

@@ -2,10 +2,10 @@ import { api } from '@/lib/api';
 import { LoginInput, RegisterInput, AuthUser, Tokens } from '@/lib/zod-schemas';
 
 export const authService = {
-  async login(credentials: LoginInput): Promise<{ user: AuthUser; tokens: Tokens }> {
+  async login(credentials: LoginInput): Promise<{ user: AuthUser; tokens: Tokens; pharmacyContext?: any }> {
     try {
       const response = await api.post('/auth/login', credentials);
-      
+
       // Check if the API response indicates success
       if (response.data && typeof response.data === 'object' && 'success' in response.data) {
         if (!response.data.success) {
@@ -18,21 +18,23 @@ export const authService = {
           throw error;
         }
       }
-      
+
       // The response.data is already unwrapped by the API interceptor for successful responses
-      // So it should contain { user, tokens } directly
-      const { user, tokens } = response.data;
-      
+      // So it should contain { user, tokens, pharmacyContext } directly
+      const { user, tokens, pharmacyContext } = response.data;
+
       // Store tokens in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('accessToken', tokens.accessToken);
         localStorage.setItem('refreshToken', tokens.refreshToken);
       }
-      
-      return { user, tokens };
+
+      console.log('Login response - pharmacyContext:', pharmacyContext);
+
+      return { user, tokens, pharmacyContext };
     } catch (error: any) {
       console.error('Login error details:', error);
-      
+
       // Enhance error with user-friendly message
       if (error.response?.data?.error) {
         const apiError = error.response.data.error;
@@ -40,7 +42,7 @@ export const authService = {
         (enhancedError as any).response = error.response;
         throw enhancedError;
       }
-      
+
       throw error;
     }
   },
@@ -88,39 +90,39 @@ export const authService = {
     }
   },
 
-  async getMe(): Promise<AuthUser> {
+  async getMe(): Promise<AuthUser & { pharmacyContext?: any }> {
     const response = await api.get('/auth/me');
-    
+
     // Log the raw response to debug
     console.log('Raw API response from /auth/me:', response);
     console.log('Response data:', response.data);
-    
+
     // The response.data is already unwrapped by the API interceptor
-    // So it should contain { user } directly
-    // But let's check if the structure is different
+    // So it should contain { user, pharmacyContext } directly
     let user;
+    let pharmacyContext = null;
+
     if (response.data.user) {
       user = response.data.user;
+      pharmacyContext = response.data.pharmacyContext || null;
     } else if (response.data && !response.data.user) {
       // Maybe the user data is directly in response.data
       user = response.data;
     } else {
       throw new Error('Invalid response structure from /auth/me');
     }
-    
+
     // Log the user data to debug
     console.log('User data from /auth/me:', user);
-    console.log('User firstName:', user?.firstName);
-    console.log('User lastName:', user?.lastName);
-    console.log('User email:', user?.email);
-    
+    console.log('Pharmacy context from /auth/me:', pharmacyContext);
+
     // CRITICAL: The backend MUST return firstName and lastName
     // If they're missing, this is a backend issue that needs to be fixed
     if (!user.firstName || !user.lastName) {
       console.error('❌ BACKEND ISSUE: /auth/me endpoint is not returning firstName and lastName');
       console.error('Expected: { firstName: "Abdul", lastName: "Ibrahim" }');
       console.error('Received:', { firstName: user.firstName, lastName: user.lastName });
-      
+
       // Don't use email fallback - this masks the real problem
       // Instead, throw an error to force backend fix
       throw new Error(
@@ -129,8 +131,13 @@ export const authService = {
         `Please fix the backend to return complete user profile data.`
       );
     }
-    
-    // Only set pharmacyId if not already present AND user is a pharmacy role
+
+    // Use pharmacyId from pharmacyContext if available
+    if (!user.pharmacyId && pharmacyContext?.pharmacyId) {
+      user.pharmacyId = pharmacyContext.pharmacyId;
+    }
+
+    // Only fetch pharmacy separately if still missing AND user is a pharmacy role
     // Admins don't have pharmacies, so skip this for them
     if (!user.pharmacyId && (user.role === 'PHARMACIST' || user.role === 'PHARMACY_OWNER')) {
       try {
@@ -142,9 +149,11 @@ export const authService = {
         console.warn('Could not fetch pharmacy profile for pharmacyId:', error);
       }
     }
-    
+
     console.log('✅ Final user data (correct):', user);
-    return user;
+
+    // Attach pharmacyContext to user for hooks to use
+    return { ...user, pharmacyContext };
   },
 
   async refreshToken(): Promise<Tokens> {

@@ -50,5 +50,45 @@ export const useUpdatePharmacyVerification = () => {
   });
 };
 
+export const useSetTestMode = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      pharmacyId,
+      enabled,
+      notes,
+    }: {
+      pharmacyId: string;
+      enabled: boolean;
+      notes?: string;
+    }) => pharmacyVerificationService.setTestMode(pharmacyId, enabled, notes),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'pharmacies'] });
+      queryClient.invalidateQueries({
+        queryKey: ['admin', 'pharmacies', variables.pharmacyId, 'events'],
+      });
+    },
+  });
+};
+
+export const useUpdateComplianceItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      pharmacyId,
+      item,
+      verified,
+    }: {
+      pharmacyId: string;
+      item: string;
+      verified: boolean;
+    }) => pharmacyVerificationService.updateComplianceItem(pharmacyId, item, verified),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'pharmacies'] });
+    },
+  });
+};
 
 
