@@ -8,20 +8,25 @@ import { useOrg } from '@/store/useOrg';
 import { ChatRoom } from '@/lib/zod-schemas';
 import { ThreadList } from '@/components/chat/ThreadList';
 import { ChatWindow } from '@/components/chat/ChatWindow';
-import { MessageInput } from '@/components/chat/MessageInput';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MessageSquare, RefreshCw } from 'lucide-react';
 
 export default function ChatPage() {
-  const { pharmacyId, locationId } = useOrg();
+  const { locationId, locationName } = useOrg();
   const searchParams = useSearchParams();
   const [selectedThread, setSelectedThread] = useState<ChatRoom | null>(null);
   const [showThreadList, setShowThreadList] = useState(true); // Mobile: show thread list by default
 
-  const { data: chatOrdersData, isLoading: threadsLoading, error, isError, refetch: refetchChatOrders } = useChatOrders({
+  const { data: chatOrdersData, isLoading: threadsLoading, error, isError, refetch: refetchChatOrders, isFetching } = useChatOrders({
     status: 'all',
   });
   const chatRooms = chatOrdersData?.rooms || [];
+  
+  // Refetch when location changes
+  useEffect(() => {
+    refetchChatOrders();
+  }, [locationId, refetchChatOrders]);
   
   // Debug logging
   if (isError) {
@@ -108,11 +113,17 @@ export default function ChatPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="px-2 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Chat</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Communicate with patients
-        </p>
+      <div className="flex items-center justify-between px-2 sm:px-0">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Chat</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            {locationName ? `Viewing ${locationName}` : 'Communicate with patients'}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetchChatOrders()} disabled={isFetching}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Chat Interface */}

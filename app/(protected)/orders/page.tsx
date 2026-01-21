@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ordersService, type OrderDTO } from '@/features/orders/service';
 import { useOrg } from '@/store/useOrg';
 import { OrdersTable } from '@/components/orders/OrdersTable';
-import { OrderDetail } from '@/components/orders/OrderDetail';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,10 +14,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OrderStatus } from '@/lib/zod-schemas';
-import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
 export default function OrdersPage() {
-  const { pharmacyId } = useOrg();
+  const { pharmacyId, locationId, locationName } = useOrg();
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -31,7 +30,7 @@ export default function OrdersPage() {
   const hasNextPage = page < totalPages;
   const hasPrevPage = page > 1;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!pharmacyId) return;
     setLoading(true);
     try {
@@ -53,21 +52,26 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pharmacyId, status, searchQuery, page, pageSize]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pharmacyId, status, searchQuery, page]);
+  }, [load, locationId]); // Also refresh when locationId changes
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-        <p className="text-muted-foreground">
-          Manage and track pharmacy orders
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground">
+            {locationName ? `Viewing ${locationName}` : 'Manage and track pharmacy orders'}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Filters */}

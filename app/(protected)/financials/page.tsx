@@ -40,7 +40,8 @@ import {
   Building2,
   AlertCircle,
   Trash2,
-  User
+  User,
+  RefreshCw
 } from 'lucide-react';
 import { useOrg } from '@/store/useOrg';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
@@ -153,7 +154,7 @@ export default function FinancialsPage() {
   const isOwner = roleType === 'PHARMACY_OWNER';
 
   // Fetch financial data from API - includes locationId in query key for automatic refetch
-  const { data: financialData, isLoading, error } = useQuery({
+  const { data: financialData, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['financials', pharmacyId, locationId, dateRange],
     queryFn: async (): Promise<FinancialData> => {
       // locationId is automatically sent via X-Location-Id header by api interceptor
@@ -360,6 +361,10 @@ export default function FinancialsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <div className="flex border rounded-md">
             {(['7d', '30d', '90d', 'all'] as const).map((range) => (
               <Button
