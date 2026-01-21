@@ -63,3 +63,16 @@ export const useMarkAllNotificationsAsRead = () => {
     },
   });
 };
+
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (notificationId: string) => 
+      notificationsService.deleteNotification(notificationId),
+    onSuccess: () => {
+      // Invalidate notifications query to refetch
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};

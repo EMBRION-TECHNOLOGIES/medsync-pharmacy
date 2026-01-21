@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bell, Check, CheckCheck, AlertCircle, Info, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Bell, Check, CheckCheck, AlertCircle, Info, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,9 +13,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotifications, useMarkNotificationAsRead, useMarkAllNotificationsAsRead, Notification } from '@/features/notifications/hooks';
+import { useNotifications, useMarkNotificationAsRead, useMarkAllNotificationsAsRead, useDeleteNotification, Notification } from '@/features/notifications/hooks';
 import { useOrg } from '@/store/useOrg';
 import { formatDistanceToNow } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
 const getNotificationIcon = (type: Notification['type']) => {
   switch (type) {
@@ -47,9 +48,11 @@ const getNotificationColor = (type: Notification['type']) => {
 
 export function NotificationsDropdown() {
   const { pharmacyId, locationId } = useOrg();
+  const router = useRouter();
   const { data: notificationsData, isLoading, refetch } = useNotifications(pharmacyId);
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
+  const deleteNotification = useDeleteNotification();
   
   // Refetch when location changes (for location-scoped users)
   React.useEffect(() => {
@@ -69,6 +72,16 @@ export function NotificationsDropdown() {
     if (pharmacyId) {
       markAllAsRead.mutate(pharmacyId);
     }
+  };
+
+  const handleDelete = (notificationId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteNotification.mutate(notificationId);
+  };
+
+  const handleViewAll = () => {
+    router.push('/notifications');
   };
 
   return (
@@ -117,19 +130,28 @@ export function NotificationsDropdown() {
               {notifications.map((notification) => (
                 <DropdownMenuItem
                   key={notification.id}
-                  className="flex items-start gap-3 p-3 cursor-pointer"
+                  className="flex items-start gap-3 p-3 cursor-pointer relative group"
                   onClick={() => !notification.read && handleMarkAsRead(notification.id)}
                 >
-                  <div className="flex-shrink-0 mt-0.5">
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => handleDelete(notification.id, e)}
+                    className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    title="Dismiss"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                  
+                  <div className="shrink-0 mt-0.5">
                     {getNotificationIcon(notification.type)}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-start justify-between gap-2">
                       <p className={`text-sm font-medium ${notification.read ? 'text-muted-foreground' : getNotificationColor(notification.type)}`}>
                         {notification.title}
                       </p>
                       {!notification.read && (
-                        <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
+                        <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -148,7 +170,10 @@ export function NotificationsDropdown() {
         {notifications.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-sm text-muted-foreground">
+            <DropdownMenuItem 
+              className="text-center text-sm text-muted-foreground cursor-pointer"
+              onClick={handleViewAll}
+            >
               View all notifications
             </DropdownMenuItem>
           </>
