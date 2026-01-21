@@ -16,6 +16,7 @@ import { useAuth, useLogout } from '@/features/auth/hooks';
 import { OrgSwitcher } from './OrgSwitcher';
 import { ConnectionStatus } from '@/components/common/ConnectionStatus';
 import { NotificationsDropdown } from '@/components/common/NotificationsDropdown';
+import { AdminNotificationPanel } from '@/components/admin/NotificationPanel';
 import { AuthUser } from '@/lib/zod-schemas';
 
 interface TopbarProps {
@@ -108,8 +109,8 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           {/* Connection Status */}
           <ConnectionStatus />
 
-          {/* Notifications */}
-          <NotificationsDropdown />
+          {/* Notifications - Use AdminNotificationPanel for admins, NotificationsDropdown for pharmacy users */}
+          {isAdmin ? <AdminNotificationPanel /> : <NotificationsDropdown />}
 
           {/* Profile dropdown */}
           <DropdownMenu>

@@ -15,6 +15,13 @@ import {
   FileCheck,
   ScrollText,
   Building2,
+  Headphones,
+  Pill,
+  Bot,
+  Heart,
+  FileText,
+  StickyNote,
+  AlertTriangle,
   LucideIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -136,15 +143,99 @@ const navigationItems: NavItem[] = [
   
   // === ADMIN-ONLY ROUTES ===
   {
-    name: 'Pharmacy Verification',
+    name: 'Admin Dashboard',
+    href: '/admin/dashboard',
+    icon: LayoutDashboard,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'All Pharmacies',
+    href: '/admin/pharmacies',
+    icon: Building2,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'All Users',
+    href: '/admin/users',
+    icon: Users,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Verification',
     href: '/admin/verification',
     icon: ShieldCheck,
     roles: ['ADMIN'],
   },
   {
-    name: 'Governance Review',
+    name: 'Governance',
     href: '/admin/governance',
-    icon: Building2,
+    icon: ShieldCheck,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Orders',
+    href: '/admin/orders',
+    icon: Package,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Financials',
+    href: '/admin/financials',
+    icon: DollarSign,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Support',
+    href: '/admin/support',
+    icon: Headphones,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Medications',
+    href: '/admin/medications',
+    icon: Pill,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'AI Usage',
+    href: '/admin/ai',
+    icon: Bot,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Vitals',
+    href: '/admin/vitals',
+    icon: Heart,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Health Records',
+    href: '/admin/health-records',
+    icon: FileText,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Dispatch',
+    href: '/admin/dispatch',
+    icon: Truck,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Notes',
+    href: '/admin/notes',
+    icon: StickyNote,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Emergency',
+    href: '/admin/emergency',
+    icon: AlertTriangle,
+    roles: ['ADMIN'],
+  },
+  {
+    name: 'Audit Logs',
+    href: '/admin/audit-logs',
+    icon: ScrollText,
     roles: ['ADMIN'],
   },
 ];
@@ -156,7 +247,7 @@ export function Sidebar() {
 
   // Determine home route based on user role
   const isAdmin = user?.role === 'ADMIN';
-  const homeRoute = isAdmin ? '/admin/verification' : '/dashboard';
+  const homeRoute = isAdmin ? '/admin/dashboard' : '/dashboard';
 
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Sidebar.tsx:RENDER',message:'Sidebar render state',data:{userRole:user?.role,roleType,canOperate,isLoaded,governanceStatus,hasPermissions:!!permissions,permissionKeys:permissions?Object.keys(permissions):null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H5'})}).catch(()=>{});
@@ -230,13 +321,13 @@ export function Sidebar() {
 
     return true;
   });
-
+ 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-background">
-      <div className="flex h-16 items-center border-b px-6">
+      <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href={homeRoute} className="flex items-center space-x-2">
           <Image
-            src="/terasync_logo.png"
+            src="/terasync_png_full.png"
             alt="TeraSync Logo"
             width={32}
             height={32}
