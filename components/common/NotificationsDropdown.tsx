@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Bell, Check, CheckCheck, AlertCircle, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,10 +46,17 @@ const getNotificationColor = (type: Notification['type']) => {
 };
 
 export function NotificationsDropdown() {
-  const { pharmacyId } = useOrg();
-  const { data: notificationsData, isLoading } = useNotifications(pharmacyId);
+  const { pharmacyId, locationId } = useOrg();
+  const { data: notificationsData, isLoading, refetch } = useNotifications(pharmacyId);
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
+  
+  // Refetch when location changes (for location-scoped users)
+  React.useEffect(() => {
+    if (pharmacyId) {
+      refetch();
+    }
+  }, [locationId, pharmacyId, refetch]);
   
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notificationsData?.unreadCount || 0;

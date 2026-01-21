@@ -11,6 +11,8 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   pharmacyId?: string;
+  locationId?: string;
+  category?: string; // e.g., 'orders', 'dispatch', 'chat', 'staff', 'compliance'
 }
 
 export interface NotificationResponse {
@@ -19,6 +21,13 @@ export interface NotificationResponse {
   total: number;
 }
 
+/**
+ * Hook to fetch notifications for the current user
+ * Notifications are automatically scoped based on:
+ * - User's pharmacy (from X-Pharmacy-Id header)
+ * - User's location (from X-Location-Id header) for location-scoped users
+ * - User's role and permissions (filtered by backend)
+ */
 export const useNotifications = (pharmacyId?: string) => {
   return useQuery({
     queryKey: ['notifications', pharmacyId],

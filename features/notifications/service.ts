@@ -2,17 +2,26 @@ import { api } from '@/lib/api';
 import { Notification, NotificationResponse } from './hooks';
 
 export const notificationsService = {
+  /**
+   * Get notifications for the current user
+   * The backend filters based on:
+   * - User ID (from auth token)
+   * - Pharmacy ID (from X-Pharmacy-Id header)
+   * - Location ID (from X-Location-Id header) for location-scoped users
+   * - User's role and permissions
+   */
   async getNotifications(pharmacyId?: string): Promise<NotificationResponse> {
-    const params = new URLSearchParams();
-    if (pharmacyId) {
-      params.append('pharmacyId', pharmacyId);
-    }
+    // Note: pharmacyId and locationId are sent via headers by the API interceptor
+    // The backend will filter notifications based on user's role and scope
+    const response = await api.get('/notifications');
     
-    const response = await api.get(`/notifications?${params}`);
+    // Handle both wrapped and unwrapped responses
+    const data = response.data?.data || response.data;
+    
     return {
-      notifications: response.data.notifications || [],
-      unreadCount: response.data.unreadCount || 0,
-      total: response.data.total || 0,
+      notifications: data?.notifications || [],
+      unreadCount: data?.unreadCount || data?.count || 0,
+      total: data?.total || data?.notifications?.length || 0,
     };
   },
 
@@ -21,7 +30,7 @@ export const notificationsService = {
   },
 
   async markAllAsRead(pharmacyId: string): Promise<void> {
-    await api.patch(`/notifications/mark-all-read`, { pharmacyId });
+    await api.patch(`/notifications/mark-all-read`);
   },
 
   async createNotification(data: {
