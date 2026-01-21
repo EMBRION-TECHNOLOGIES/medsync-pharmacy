@@ -430,7 +430,7 @@ export default function AIOverviewPage() {
                     <CardContent className="py-2">
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div><span className="text-muted-foreground">Name:</span> {invocationDetail.user.name}</div>
-                        <div><span className="text-muted-foreground">Email:</span> {invocationDetail.user.email}</div>
+                        <div className="col-span-2 break-words"><span className="text-muted-foreground">Email:</span> {invocationDetail.user.email}</div>
                       </div>
                     </CardContent>
                   </Card>

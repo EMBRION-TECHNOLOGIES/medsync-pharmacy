@@ -531,7 +531,7 @@ export default function SupportTicketsPage() {
                         <div>
                           <span className="text-muted-foreground">Name:</span> {ticketDetail.user.name}
                         </div>
-                        <div>
+                        <div className="col-span-2 break-words">
                           <span className="text-muted-foreground">Email:</span> {ticketDetail.user.email}
                         </div>
                         {ticketDetail.user.phone && (

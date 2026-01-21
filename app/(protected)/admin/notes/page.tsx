@@ -428,7 +428,7 @@ export default function NotesOversightPage() {
                     <CardContent className="py-2">
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div><span className="text-muted-foreground">Name:</span> {noteDetail.user.name}</div>
-                        <div><span className="text-muted-foreground">Email:</span> {noteDetail.user.email}</div>
+                        <div className="col-span-2 break-words"><span className="text-muted-foreground">Email:</span> {noteDetail.user.email}</div>
                         {noteDetail.user.phone && <div><span className="text-muted-foreground">Phone:</span> {noteDetail.user.phone}</div>}
                         {noteDetail.user.medSyncId && <div><span className="text-muted-foreground">MedSync ID:</span> {noteDetail.user.medSyncId}</div>}
                       </div>

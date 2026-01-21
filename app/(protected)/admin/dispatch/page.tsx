@@ -478,7 +478,7 @@ export default function DispatchOversightPage() {
                         {dispatchDetail.order.customer && (
                           <>
                             <div><span className="text-muted-foreground">Customer:</span> {dispatchDetail.order.customer.name}</div>
-                            <div><span className="text-muted-foreground">Email:</span> {dispatchDetail.order.customer.email}</div>
+                            <div className="col-span-2 break-words"><span className="text-muted-foreground">Email:</span> {dispatchDetail.order.customer.email}</div>
                           </>
                         )}
                       </div>

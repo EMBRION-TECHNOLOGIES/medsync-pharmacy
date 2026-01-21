@@ -513,7 +513,7 @@ export default function MedicationsOversightPage() {
                         <div>
                           <span className="text-muted-foreground">Name:</span> {medicationDetail.user.name}
                         </div>
-                        <div>
+                        <div className="col-span-2 break-words">
                           <span className="text-muted-foreground">Email:</span> {medicationDetail.user.email}
                         </div>
                         {medicationDetail.user.phone && (

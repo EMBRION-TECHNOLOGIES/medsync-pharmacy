@@ -373,7 +373,7 @@ export default function EmergencyOversightPage() {
                   <CardContent className="py-2">
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div><span className="text-muted-foreground">Name:</span> {userDetail.name}</div>
-                      <div><span className="text-muted-foreground">Email:</span> {userDetail.email}</div>
+                      <div className="col-span-2 break-words"><span className="text-muted-foreground">Email:</span> {userDetail.email}</div>
                       {userDetail.phone && <div><span className="text-muted-foreground">Phone:</span> {userDetail.phone}</div>}
                       {userDetail.medSyncId && <div><span className="text-muted-foreground">MedSync ID:</span> {userDetail.medSyncId}</div>}
                       {userDetail.dateOfBirth && <div><span className="text-muted-foreground">DOB:</span> {format(new Date(userDetail.dateOfBirth), 'MMM d, yyyy')}</div>}
