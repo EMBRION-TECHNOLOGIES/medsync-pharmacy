@@ -75,11 +75,18 @@ export default function NotificationsPage() {
   }, [locationId, pharmacyId, refetch]);
 
   const notifications = notificationsData?.notifications || [];
+  const apiUnreadCount = notificationsData?.unreadCount || 0;
   
-  // Calculate counts from the actual notifications array (not from API's unreadCount which might be for all notifications)
-  const actualUnreadCount = notifications.filter((n) => !n.read).length;
-  const actualReadCount = notifications.filter((n) => n.read).length;
-  const totalCount = notifications.length;
+  // Calculate counts from the actual notifications array
+  const displayedUnreadCount = notifications.filter((n) => !n.read).length;
+  const displayedReadCount = notifications.filter((n) => n.read).length;
+  const displayedTotalCount = notifications.length;
+  
+  // Use API's unreadCount for the unread stat (this is the true total unread, matching the dropdown badge)
+  // The backend returns paginated notifications (default limit: 20), so displayed counts may be less
+  const unreadCount = apiUnreadCount; // This matches the dropdown badge count
+  const totalCount = notificationsData?.total || displayedTotalCount;
+  const readCount = Math.max(0, totalCount - unreadCount); // Ensure non-negative
 
   // Filter notifications
   const filteredNotifications = notifications.filter((n) => {
@@ -128,7 +135,7 @@ export default function NotificationsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {actualUnreadCount > 0 && (
+          {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={markAllAsRead.isPending}>
               <CheckCheck className="h-4 w-4 mr-2" />
               Mark all read
@@ -156,11 +163,16 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Unread</p>
-              <p className="text-2xl font-bold text-primary">{actualUnreadCount}</p>
+              <p className="text-2xl font-bold text-primary">{unreadCount}</p>
+              {displayedUnreadCount < unreadCount && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {displayedUnreadCount} of {unreadCount} shown
+                </p>
+              )}
             </div>
-            {actualUnreadCount > 0 && (
+            {unreadCount > 0 && (
               <Badge variant="destructive" className="h-8 w-8 rounded-full flex items-center justify-center">
-                {actualUnreadCount > 99 ? '99+' : actualUnreadCount}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </Badge>
             )}
           </div>
@@ -169,7 +181,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Read</p>
-              <p className="text-2xl font-bold">{actualReadCount}</p>
+              <p className="text-2xl font-bold">{readCount}</p>
+              {displayedReadCount < readCount && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {displayedReadCount} of {readCount} shown
+                </p>
+              )}
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
