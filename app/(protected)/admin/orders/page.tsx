@@ -148,6 +148,16 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+function formatStatus(status: string): string {
+  if (!status) return 'Unknown';
+  
+  // Convert to title case: replace underscores with spaces, then capitalize each word
+  return status
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function AdminOrdersPage() {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -264,7 +274,7 @@ export default function AdminOrdersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Order Status</label>
                 <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
@@ -322,7 +332,7 @@ export default function AdminOrdersPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium invisible">Actions</label>
+                <label className="text-sm font-medium">Actions</label>
                 <div className="flex gap-2">
                   <Button onClick={handleSearch} className="flex-1">
                     <Search className="h-4 w-4 mr-2" />
@@ -418,12 +428,12 @@ export default function AdminOrdersPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={getStatusBadgeClass(order.status)}>
-                              {order.status}
+                              {formatStatus(order.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={getPaymentBadgeClass(order.paymentStatus)}>
-                              {order.paymentStatus || 'N/A'}
+                              {formatStatus(order.paymentStatus || 'N/A')}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-medium">
@@ -574,7 +584,7 @@ export default function AdminOrdersPage() {
                       <Truck className="h-4 w-4 text-muted-foreground" />
                       <span>{selectedOrder.dispatch.provider}</span>
                       <Badge variant="outline" className={getStatusBadgeClass(selectedOrder.dispatch.status)}>
-                        {selectedOrder.dispatch.status}
+                        {formatStatus(selectedOrder.dispatch.status)}
                       </Badge>
                     </div>
                   </div>
