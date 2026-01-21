@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, X, CheckCheck, AlertCircle, Info, AlertTriangle, CheckCircle, Bell } from 'lucide-react';
+import { RefreshCw, X, CheckCheck, AlertCircle, Info, AlertTriangle, CheckCircle, Bell, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -59,7 +59,9 @@ const getCategoryLabel = (category?: string) => {
 
 export default function NotificationsPage() {
   const { pharmacyId, locationId, locationName } = useOrg();
-  const { data: notificationsData, isLoading, refetch, isFetching } = useNotifications(pharmacyId);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const { data: notificationsData, isLoading, refetch, isFetching } = useNotifications(pharmacyId, { page, limit: pageSize });
   const markAsRead = useMarkNotificationAsRead();
   const markAllAsRead = useMarkAllNotificationsAsRead();
   const deleteNotification = useDeleteNotification();
@@ -67,12 +69,17 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filter, categoryFilter]);
+
   // Refetch when location changes
   useEffect(() => {
     if (pharmacyId) {
       refetch();
     }
-  }, [locationId, pharmacyId, refetch]);
+  }, [locationId, pharmacyId, refetch, page]);
 
   const notifications = notificationsData?.notifications || [];
   const apiUnreadCount = notificationsData?.unreadCount || 0;
@@ -87,6 +94,13 @@ export default function NotificationsPage() {
   const unreadCount = apiUnreadCount; // This matches the dropdown badge count
   const totalCount = notificationsData?.total || displayedTotalCount;
   const readCount = Math.max(0, totalCount - unreadCount); // Ensure non-negative
+
+  // Pagination calculations
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+  const startIndex = (page - 1) * pageSize + 1;
+  const endIndex = Math.min(page * pageSize, totalCount);
 
   // Filter notifications
   const filteredNotifications = notifications.filter((n) => {
@@ -164,11 +178,6 @@ export default function NotificationsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Unread</p>
               <p className="text-2xl font-bold text-primary">{unreadCount}</p>
-              {displayedUnreadCount < unreadCount && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {displayedUnreadCount} of {unreadCount} shown
-                </p>
-              )}
             </div>
             {unreadCount > 0 && (
               <Badge variant="destructive" className="h-8 w-8 rounded-full flex items-center justify-center">
@@ -182,11 +191,6 @@ export default function NotificationsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Read</p>
               <p className="text-2xl font-bold">{readCount}</p>
-              {displayedReadCount < readCount && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {displayedReadCount} of {readCount} shown
-                </p>
-              )}
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -301,6 +305,63 @@ export default function NotificationsPage() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {totalCount > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {startIndex} to {endIndex} of {totalCount} notifications
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!hasPrevPage || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Show pages around current page
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (page <= 3) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = page - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={page === pageNum ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPage(pageNum)}
+                    disabled={isLoading}
+                    className="w-10"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={!hasNextPage || isLoading}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

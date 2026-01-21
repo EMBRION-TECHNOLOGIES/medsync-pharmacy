@@ -10,10 +10,20 @@ export const notificationsService = {
    * - Location ID (from X-Location-Id header) for location-scoped users
    * - User's role and permissions
    */
-  async getNotifications(pharmacyId?: string): Promise<NotificationResponse> {
+  async getNotifications(pharmacyId?: string, options?: { page?: number; limit?: number }): Promise<NotificationResponse> {
     // Note: pharmacyId and locationId are sent via headers by the API interceptor
     // The backend will filter notifications based on user's role and scope
-    const response = await api.get('/notifications');
+    const params = new URLSearchParams();
+    if (options?.page) {
+      params.append('page', options.page.toString());
+    }
+    if (options?.limit) {
+      params.append('limit', options.limit.toString());
+    }
+    
+    const queryString = params.toString();
+    const url = queryString ? `/notifications?${queryString}` : '/notifications';
+    const response = await api.get(url);
     
     // Handle both wrapped and unwrapped responses
     const data = response.data?.data || response.data;

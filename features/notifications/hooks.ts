@@ -28,10 +28,10 @@ export interface NotificationResponse {
  * - User's location (from X-Location-Id header) for location-scoped users
  * - User's role and permissions (filtered by backend)
  */
-export const useNotifications = (pharmacyId?: string) => {
+export const useNotifications = (pharmacyId?: string, options?: { page?: number; limit?: number }) => {
   return useQuery({
-    queryKey: ['notifications', pharmacyId],
-    queryFn: () => notificationsService.getNotifications(pharmacyId),
+    queryKey: ['notifications', pharmacyId, options?.page, options?.limit],
+    queryFn: () => notificationsService.getNotifications(pharmacyId, options),
     enabled: !!pharmacyId,
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 10000, // Consider stale after 10 seconds
