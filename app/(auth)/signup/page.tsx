@@ -370,7 +370,7 @@ export default function SignupPage() {
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <Image
-              src="/terasync_logo.png"
+              src="/terasync_png_full.png"
               alt="TeraSync Logo"
               width={150}
               height={50}

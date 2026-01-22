@@ -260,7 +260,7 @@ export default function FinancialsPage() {
     }
 
     // Create CSV content
-    const headers = ['Order Number', 'Date', 'Customer MedSync ID', 'Amount (NGN)', 'Status'];
+    const headers = ['Order Number', 'Date', 'Customer TeraSync ID', 'Amount (NGN)', 'Status'];
     const rows = transactions.map((t: Transaction) => [
       t.orderNumber || t.description,
       format(new Date(t.date), 'yyyy-MM-dd HH:mm'),
@@ -466,7 +466,7 @@ export default function FinancialsPage() {
             <CardHeader>
               <CardTitle>Recent Orders</CardTitle>
               <CardDescription>
-                Your pharmacy's order history with customer MedSync IDs
+                Your pharmacy's order history with customer TeraSync IDs
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -503,7 +503,7 @@ export default function FinancialsPage() {
                           <p className="text-sm text-muted-foreground">
                             {format(new Date(transaction.date), 'MMM d, yyyy • h:mm a')}
                           </p>
-                          {/* Customer MedSync ID */}
+                          {/* Customer TeraSync ID */}
                           <div className="flex items-center gap-1 mt-1">
                             <User className="h-3 w-3 text-muted-foreground" />
                             <span className="text-xs font-mono text-primary">

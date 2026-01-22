@@ -225,7 +225,7 @@ export default function CompliancePage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Pending Approval</AlertTitle>
           <AlertDescription>
-            Your pharmacy is awaiting MedSync admin approval. Documents are reviewed manually. 
+            Your pharmacy is awaiting TeraSync admin approval. Documents are reviewed manually. 
             Approval typically takes 1-2 business days after all requirements are met and documents are submitted.
           </AlertDescription>
         </Alert>
@@ -626,7 +626,7 @@ export default function CompliancePage() {
               Platform Approval
             </CardTitle>
             <CardDescription>
-              MedSync verification and operational status
+              TeraSync verification and operational status
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

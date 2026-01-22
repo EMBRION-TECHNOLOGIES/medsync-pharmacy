@@ -412,7 +412,7 @@ export default function VitalsOversightPage() {
                         <div><span className="text-muted-foreground">Name:</span> {vitalDetail.user.name}</div>
                         <div className="col-span-2 break-words"><span className="text-muted-foreground">Email:</span> {vitalDetail.user.email}</div>
                         {vitalDetail.user.phone && <div><span className="text-muted-foreground">Phone:</span> {vitalDetail.user.phone}</div>}
-                        {vitalDetail.user.medSyncId && <div><span className="text-muted-foreground">MedSync ID:</span> {vitalDetail.user.medSyncId}</div>}
+                        {vitalDetail.user.medSyncId && <div><span className="text-muted-foreground">TeraSync ID:</span> {vitalDetail.user.medSyncId}</div>}
                       </div>
                     </CardContent>
                   </Card>

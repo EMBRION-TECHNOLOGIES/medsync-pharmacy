@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmacy Registration Form</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        
+        @media print {
+            body {
+                padding: 20px;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            color: #1e40af;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        table th,
+        table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        table th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #1e293b;
+            width: 30%;
+        }
+        
+        table td {
+            background-color: #fff;
+        }
+        
+        .input-field {
+            min-height: 40px;
+            border-bottom: 2px solid #cbd5e1;
+            width: 100%;
+            padding: 8px 0;
+        }
+        
+        .input-field-double {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .helper-text {
+            font-size: 12px;
+            color: #64748b;
+            font-style: italic;
+            margin-top: 4px;
+        }
+        
+        .required {
+            color: #dc2626;
+        }
+        
+        .info-box {
+            background-color: #eff6ff;
+            border: 1px solid #93c5fd;
+            border-left: 4px solid #2563eb;
+            padding: 16px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box h4 {
+            color: #1e40af;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+        
+        .info-box li {
+            margin-bottom: 4px;
+        }
+        
+        .requirements-list {
+            background-color: #f8fafc;
+            padding: 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+        }
+        
+        .requirements-list ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .requirements-list li {
+            padding: 6px 0;
+            padding-left: 24px;
+            position: relative;
+        }
+        
+        .requirements-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        .review-section {
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .review-section h4 {
+            color: #1e293b;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .review-section p {
+            color: #475569;
+            margin-bottom: 16px;
+        }
+        
+        .signature-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .signature-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 20px;
+        }
+        
+        .footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            font-size: 12px;
+            color: #64748b;
+            text-align: center;
+        }
+        
+        .alert-box {
+            background-color: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .alert-box h4 {
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+        
+        .alert-box ol {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+        
+        .alert-box li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Pharmacy Registration Form</h1>
+        <p>Please fill out this form completely and accurately. All fields marked with <span class="required">*</span> are required.</p>
+    </div>
+
+    <!-- Step 1: Personal Information -->
+    <div class="section">
+        <h2 class="section-title">
+            <span class="step-number">1</span>
+            Personal Information
+        </h2>
+        
+        <h3 style="margin-bottom: 16px; color: #475569;">Account Holder Details</h3>
+        
+        <table>
+            <tr>
+                <th>First Name <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                </td>
+            </tr>
+            <tr>
+                <th>Last Name <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                </td>
+            </tr>
+            <tr>
+                <th>Email Address <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">e.g., john.doe@pharmacy.com</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Phone Number</th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">(Optional)</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Password <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="requirements-list">
+                        <strong>Password Requirements:</strong>
+                        <ul>
+                            <li>Minimum 8 characters</li>
+                            <li>At least one uppercase letter</li>
+                            <li>At least one lowercase letter</li>
+                            <li>At least one number</li>
+                            <li>At least one special character (@$!%*?&)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <th>Confirm Password <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">Must match password above</div>
+                </td>
+            </tr>
+        </table>
+        
+        <div class="info-box">
+            <h4>Account Type</h4>
+            <p><strong>Pharmacy Owner</strong> (Pharmacy Admin Account)</p>
+            <p style="margin-top: 8px; font-size: 14px;">You are registering as a Pharmacy Owner to create and manage your pharmacy.</p>
+        </div>
+    </div>
+
+    <!-- Step 2: Pharmacy Information -->
+    <div class="section">
+        <h2 class="section-title">
+            <span class="step-number">2</span>
+            Pharmacy Information
+        </h2>
+        
+        <h3 style="margin-bottom: 16px; color: #475569;">Pharmacy Details</h3>
+        
+        <table>
+            <tr>
+                <th>Pharmacy Name <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">Enter Your Pharmacy Name</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Pharmacy Address <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">Full street address, city, state</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Latitude</th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">(Optional - GPS coordinates)</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Longitude</th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">(Optional - GPS coordinates)</div>
+                </td>
+            </tr>
+            <tr>
+                <th>Pharmacy Email <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">e.g., info@yourpharmacy.com</div>
+                </td>
+            </tr>
+            <tr>
+                <th>License Number <span class="required">*</span></th>
+                <td>
+                    <div class="input-field"></div>
+                    <div class="helper-text">Nigerian Pharmacy Council License Number</div>
+                    <div class="helper-text">Format: PH123456789</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Step 3: Additional Information -->
+    <div class="section">
+        <h2 class="section-title">
+            <span class="step-number">3</span>
+            Additional Information (Optional)
+        </h2>
+        
+        <table>
+            <tr>
+                <th>Pharmacy Description</th>
+                <td>
+                    <div class="input-field" style="min-height: 100px;"></div>
+                    <div class="helper-text">Brief description of your pharmacy, services offered, etc.</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Governance Onboarding Process -->
+    <div class="section">
+        <h2 class="section-title">Governance Onboarding Process</h2>
+        
+        <div class="alert-box">
+            <h4>After registration, you'll need to complete the following steps:</h4>
+            <ol>
+                <li><strong>Invite Required Roles:</strong> Send invitations to:
+                    <ul style="margin-top: 8px;">
+                        <li>Superintendent Pharmacist</li>
+                        <li>Supervising Pharmacist</li>
+                    </ul>
+                </li>
+                <li><strong>Role Confirmations:</strong> Each role must confirm their responsibilities via secure email link</li>
+                <li><strong>Send Documents:</strong> After all roles confirm, email verification documents to <strong>admin@terasync.ng</strong>
+                    <div style="margin-top: 12px;">
+                        <strong>Required Documents:</strong>
+                        <ul style="margin-top: 8px;">
+                            <li>PCN Registration Certificate</li>
+                            <li>CAC Registration Document</li>
+                            <li>Pharmacist License</li>
+                            <li>Government-Issued ID</li>
+                            <li>Proof of Premises</li>
+                        </ul>
+                    </div>
+                </li>
+                <li><strong>Admin Review:</strong> Our team will review and activate your pharmacy</li>
+            </ol>
+            <p style="margin-top: 12px; font-size: 14px;">
+                Once all roles are confirmed, you can access the <strong>Pharmacy Team</strong> section to invite team members and track progress.
+            </p>
+        </div>
+    </div>
+
+    <!-- Review & Confirmation -->
+    <div class="section">
+        <h2 class="section-title">Review & Confirmation</h2>
+        
+        <p style="margin-bottom: 20px; color: #64748b;">Please review all information before submitting:</p>
+        
+        <div class="review-section">
+            <h4>Personal Information:</h4>
+            <p>Name: _________________________________</p>
+            <p>Email: _________________________________</p>
+        </div>
+        
+        <div class="review-section">
+            <h4>Pharmacy Information:</h4>
+            <p>Pharmacy Name: _________________________________</p>
+            <p>Address: _________________________________</p>
+            <p>License Number: _________________________________</p>
+        </div>
+    </div>
+
+    <!-- Signature Section -->
+    <div class="signature-section">
+        <div class="signature-row">
+            <div>
+                <strong>Date:</strong>
+                <div class="input-field" style="margin-top: 8px;"></div>
+            </div>
+            <div>
+                <strong>Signature:</strong>
+                <div class="input-field" style="margin-top: 8px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Notes -->
+    <div class="section">
+        <h2 class="section-title">Important Notes</h2>
+        
+        <div class="info-box">
+            <ul style="list-style: disc; margin-left: 20px;">
+                <li>All information provided must be accurate and verifiable</li>
+                <li>Your pharmacy will be activated after successful completion of the governance onboarding process</li>
+                <li>You will receive email notifications at each step of the process</li>
+                <li>For support, contact: <strong>admin@terasync.ng</strong></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>This form mirrors the online pharmacy registration process. All information provided will be used solely for pharmacy registration and verification purposes.</p>
+    </div>
+</body>
+</html>

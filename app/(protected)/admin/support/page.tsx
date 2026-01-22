@@ -541,7 +541,7 @@ export default function SupportTicketsPage() {
                         )}
                         {ticketDetail.user.medSyncId && (
                           <div>
-                            <span className="text-muted-foreground">MedSync ID:</span> {ticketDetail.user.medSyncId}
+                            <span className="text-muted-foreground">TeraSync ID:</span> {ticketDetail.user.medSyncId}
                           </div>
                         )}
                       </div>

@@ -523,7 +523,7 @@ export default function MedicationsOversightPage() {
                         )}
                         {medicationDetail.user.medSyncId && (
                           <div>
-                            <span className="text-muted-foreground">MedSync ID:</span> {medicationDetail.user.medSyncId}
+                            <span className="text-muted-foreground">TeraSync ID:</span> {medicationDetail.user.medSyncId}
                           </div>
                         )}
                       </div>

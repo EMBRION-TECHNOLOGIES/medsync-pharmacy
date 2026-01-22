@@ -566,7 +566,7 @@ export default function AdminOrdersPage() {
                   </div>
                   {selectedOrder.patient?.medSyncId && (
                     <p className="text-sm text-muted-foreground font-mono">
-                      MedSync ID: {selectedOrder.patient.medSyncId}
+                      TeraSync ID: {selectedOrder.patient.medSyncId}
                     </p>
                   )}
                   {selectedOrder.deliveryAddress && (

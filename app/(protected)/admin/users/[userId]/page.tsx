@@ -337,7 +337,7 @@ export default function UserDetailPage() {
                       <p className="font-medium">{user.name}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">MedSync ID</p>
+                      <p className="text-muted-foreground">TeraSync ID</p>
                       <p className="font-mono">{user.medSyncId || '-'}</p>
                     </div>
                     <div>
