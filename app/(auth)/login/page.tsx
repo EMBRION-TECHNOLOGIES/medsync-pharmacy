@@ -64,7 +64,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <Image
-              src="/terasync_png_full.png"
+              src="/terasync_png.png"
               alt="TeraSync Logo"
               width={150}
               height={50}
