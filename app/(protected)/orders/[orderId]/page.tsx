@@ -19,6 +19,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+/** Mask phone for privacy: +2348012345678 → +2348*******8 */
+function maskPhone(phone: string | null | undefined): string {
+  if (!phone || typeof phone !== 'string') return '—';
+  const s = phone.trim();
+  if (s.length < 8) return '—';
+  const first = s.slice(0, 5);
+  const last = s.slice(-1);
+  const n = Math.max(0, s.length - 6);
+  return `${first}${'*'.repeat(n)}${last}`;
+}
+
 export default function OrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = use(params);
   const [order, setOrder] = useState<OrderDTO | null>(null);
@@ -231,7 +242,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
               {order.receiverPhone && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Contact Phone</span>
-                  <span className="font-medium">{order.receiverPhone}</span>
+                  <span className="font-medium font-mono">{maskPhone(order.receiverPhone)}</span>
                 </div>
               )}
               {order.deliveryAddress && (
@@ -269,9 +280,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                     <span>Total Medication Price</span>
                     <span>₦{Number(order.priceNgn || 0).toLocaleString()}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    * Patient will see additional delivery & service fees in their mobile app
-                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">

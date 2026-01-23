@@ -23,6 +23,7 @@ import {
   History
 } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { format, formatDistanceToNow } from 'date-fns';
 
@@ -48,6 +49,9 @@ interface DispatchRecord {
     drugName: string;
     status: string;
     deliveryAddress: string;
+    totalAmount?: number | string; // 🔥 Total order price (medication + delivery + fees)
+    priceNgn?: number | string; // Medication price only (for reference)
+    priceBreakdown?: any; // Price breakdown JSON (optional)
     patient?: {
       id: string;
       firstName: string;
@@ -79,15 +83,21 @@ function DispatchCard({ dispatch, isSelected, onSelect }: {
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const router = useRouter();
   const config = statusConfig[dispatch.status] || statusConfig.CREATED;
   const isActive = ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'].includes(dispatch.status);
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Navigate to order details page
+    router.push(`/orders/${dispatch.order.id}`);
+  };
   
   return (
     <div 
       className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
         isSelected ? 'ring-2 ring-primary border-primary' : ''
       } ${isActive ? 'border-l-4 border-l-yellow-500' : ''}`}
-      onClick={onSelect}
+      onClick={handleCardClick}
     >
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -160,8 +170,18 @@ function DispatchCard({ dispatch, isSelected, onSelect }: {
 }
 
 function OrderReadyCard({ order }: { order: any }) {
+  const router = useRouter();
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Navigate to order details page
+    router.push(`/orders/${order.id}`);
+  };
+  
   return (
-    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+    <div 
+      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium text-sm truncate">
@@ -180,9 +200,7 @@ function OrderReadyCard({ order }: { order: any }) {
           </p>
         )}
       </div>
-      <Button size="sm" variant="outline" className="ml-2 shrink-0">
-        <ArrowRight className="h-4 w-4" />
-      </Button>
+      <ArrowRight className="h-4 w-4 text-muted-foreground ml-2 shrink-0" />
     </div>
   );
 }
@@ -214,6 +232,7 @@ function StatsCard({ title, value, icon, description }: {
 }
 
 export default function DispatchPage() {
+  const router = useRouter();
   const { pharmacyId, locationId } = useOrg();
   const [selectedDispatchId, setSelectedDispatchId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState('active');
@@ -229,17 +248,65 @@ export default function DispatchPage() {
   // Get delivery history
   const { data: deliveryHistory, isLoading: historyLoading, refetch: refetchHistory } = useDeliveryHistory({});
 
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    try {
+      const rawValue = deliveryHistory ? JSON.stringify(deliveryHistory).substring(0,500) : 'null';
+      fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/page.tsx:deliveryHistory',message:'History query result',data:{deliveryHistoryType:typeof deliveryHistory,isArray:Array.isArray(deliveryHistory),hasData:!!deliveryHistory?.data,isLoading:historyLoading,rawKeys:deliveryHistory?Object.keys(deliveryHistory):[],rawValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,D'})}).catch(()=>{});
+    } catch(e) {
+      fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/page.tsx:deliveryHistory:ERROR',message:'Error logging deliveryHistory',data:{error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,D'})}).catch(()=>{});
+    }
+  }
+  // #endregion
+
   // Use new socket hook for dispatch tracking
   useDispatchSocket(selectedDispatchId);
 
   // Parse dispatch data
+  // Backend returns: { requests: [...], total, page, limit, totalPages }
+  // After interceptor unwrapping, dispatchRequests is the data object
   const dispatches: DispatchRecord[] = Array.isArray(dispatchRequests) 
     ? dispatchRequests 
-    : (dispatchRequests as any)?.data || [];
+    : (dispatchRequests as any)?.requests || (dispatchRequests as any)?.data || [];
     
-  const history: DispatchRecord[] = Array.isArray(deliveryHistory)
+  // 🔥 FIX: Parse history correctly - API returns { success: true, data: [...] }
+  // After interceptor: { data: [...], page, pageSize, total }
+  // But logs show: { dispatches: [], pagination: {...} }
+  // Handle both formats
+  const historyRaw: DispatchRecord[] = Array.isArray(deliveryHistory)
     ? deliveryHistory
-    : (deliveryHistory as any)?.data || [];
+    : Array.isArray((deliveryHistory as any)?.data)
+    ? (deliveryHistory as any).data
+    : Array.isArray((deliveryHistory as any)?.dispatches)
+    ? (deliveryHistory as any).dispatches
+    : (deliveryHistory as any)?.requests || [];
+  
+  // 🔥 FIX: Sort history by deliveredAt (most recent first), fallback to createdAt
+  const history: DispatchRecord[] = [...historyRaw].sort((a, b) => {
+    // Use deliveredAt if available, otherwise use createdAt
+    const dateA = a.deliveredAt ? new Date(a.deliveredAt).getTime() : new Date(a.createdAt).getTime();
+    const dateB = b.deliveredAt ? new Date(b.deliveredAt).getTime() : new Date(b.createdAt).getTime();
+    // Sort descending (most recent first)
+    return dateB - dateA;
+  });
+  
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/page.tsx:historyParsed',message:'History parsed and sorted',data:{historyLength:history.length,historyStatuses:history.map(d=>d.status),deliveredCount:history.filter(d=>d.status==='DELIVERED').length,sortedDates:history.slice(0,5).map(d=>({id:d.id,deliveredAt:d.deliveredAt,createdAt:d.createdAt}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,D'})}).catch(()=>{});
+  }
+  // #endregion
+
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 Dispatch Debug:', {
+      dispatchRequestsRaw: dispatchRequests,
+      dispatchesParsed: dispatches,
+      dispatchesCount: dispatches.length,
+      activeDispatchesCount: dispatches.filter(d => 
+        ['CREATED', 'QUOTED', 'BOOKED', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'].includes(d.status)
+      ).length,
+    });
+  }
 
   // Filter active dispatches
   const activeDispatches = dispatches.filter(d => 
@@ -250,7 +317,42 @@ export default function DispatchPage() {
     ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'].includes(d.status)
   ).length;
   
-  const deliveredCount = history.filter(d => d.status === 'DELIVERED').length;
+  // 🔥 FIX: Calculate "Delivered Today" - filter by today's date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deliveredToday = history.filter(d => {
+    if (d.status !== 'DELIVERED') return false;
+    // Use deliveredAt if available, otherwise fall back to createdAt
+    const deliveryDate = d.deliveredAt ? new Date(d.deliveredAt) : new Date(d.createdAt);
+    deliveryDate.setHours(0, 0, 0, 0);
+    return deliveryDate.getTime() === today.getTime();
+  }).length;
+  
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/page.tsx:deliveredToday',message:'Delivered today calculation',data:{todayISO:today.toISOString(),deliveredToday,allDelivered:history.filter(d=>d.status==='DELIVERED').map(d=>({id:d.id,deliveredAt:d.deliveredAt,createdAt:d.createdAt,deliveredDateISO:d.deliveredAt?new Date(d.deliveredAt).setHours(0,0,0,0):null}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  }
+  // #endregion
+  
+  const deliveredCount = deliveredToday; // Use today's count for the card
+  
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 Dispatch History Debug:', {
+      deliveryHistoryRaw: deliveryHistory,
+      historyParsed: history,
+      historyLength: history.length,
+      deliveredToday,
+      today: today.toISOString(),
+      deliveredDispatches: history.filter(d => d.status === 'DELIVERED').map(d => ({
+        id: d.id,
+        status: d.status,
+        deliveredAt: d.deliveredAt,
+        createdAt: d.createdAt,
+        orderCode: d.order?.orderCode
+      }))
+    });
+  }
   const readyForDispatchCount = orders?.orders?.length || 0;
 
   const handleRefresh = () => {
@@ -421,8 +523,17 @@ export default function DispatchPage() {
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
                     {history.map((dispatch) => {
                       const config = statusConfig[dispatch.status] || statusConfig.DELIVERED;
+                      
+                      const handleHistoryClick = () => {
+                        router.push(`/orders/${dispatch.order.id}`);
+                      };
+                      
                       return (
-                        <div key={dispatch.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div 
+                          key={dispatch.id} 
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={handleHistoryClick}
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-sm">{dispatch.order.orderCode}</p>
@@ -440,11 +551,24 @@ export default function DispatchPage() {
                               }
                             </p>
                           </div>
-                          {dispatch.deliveryCharge && (
-                            <p className="text-sm font-medium">
-                              ₦{(dispatch.deliveryCharge / 100).toLocaleString()}
-                            </p>
-                          )}
+                          {(() => {
+                            // 🔥 FIX: Display medication price only (not total order with fees)
+                            // priceNgn is in Naira (not kobo), so no division needed
+                            const medicationPrice = dispatch.order.priceNgn 
+                              ? typeof dispatch.order.priceNgn === 'string' 
+                                ? parseFloat(dispatch.order.priceNgn) 
+                                : dispatch.order.priceNgn
+                              : null;
+                            
+                            // Fallback to deliveryCharge if priceNgn not available (backward compatibility)
+                            const displayPrice = medicationPrice ?? (dispatch.deliveryCharge ? dispatch.deliveryCharge / 100 : null);
+                            
+                            return displayPrice ? (
+                              <p className="text-sm font-medium">
+                                ₦{displayPrice.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            ) : null;
+                          })()}
                         </div>
                       );
                     })}

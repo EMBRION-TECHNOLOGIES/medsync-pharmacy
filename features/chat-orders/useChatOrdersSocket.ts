@@ -178,30 +178,58 @@ export function useChatOrdersSocket() {
         console.log('Processing order update:', order);
         
         // Update specific order cache if it exists
-        if (order.id) {
-          queryClient.setQueryData(['order', order.id], order);
+        if (order.id || order.orderId) {
+          const orderId = order.id || order.orderId;
+          queryClient.setQueryData(['order', orderId], order);
         }
         
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['orders', pharmacyId] });
         queryClient.invalidateQueries({ queryKey: ['chat-orders', { scope: 'pharmacy', pharmacyId }] });
         queryClient.invalidateQueries({ queryKey: ['chat-orders'] });
+        
+        // 🔥 CRITICAL: Invalidate financials when order status changes (especially DELIVERED)
+        queryClient.invalidateQueries({ queryKey: ['financials'] });
+        queryClient.invalidateQueries({ queryKey: ['financials-transactions'] });
       },
       onDispatchUpdated: (dispatch) => {
         console.log('Processing dispatch update:', dispatch);
         
+        // #region agent log
+        if (typeof window !== 'undefined') {
+          fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useChatOrdersSocket.ts:onDispatchUpdated:ENTRY',message:'Socket dispatch update received',data:{dispatchId:dispatch.dispatch?.id||dispatch.dispatchId,status:dispatch.dispatch?.status||dispatch.dispatchStatus,hasDispatch:!!dispatch.dispatch},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        }
+        // #endregion
+        
         // Update specific dispatch query if you have it
-        if (dispatch.dispatch?.id) {
-          queryClient.setQueryData(['dispatch', dispatch.dispatch.id], dispatch.dispatch);
+        if (dispatch.dispatch?.id || dispatch.dispatchId) {
+          const dispatchId = dispatch.dispatch?.id || dispatch.dispatchId;
+          queryClient.setQueryData(['dispatch', dispatchId], dispatch.dispatch || dispatch);
         }
         
-        // Invalidate dispatch-related queries
-        queryClient.invalidateQueries({ queryKey: ['dispatch'] });
-        queryClient.invalidateQueries({ queryKey: ['dispatch-requests'] });
-        queryClient.invalidateQueries({ queryKey: ['dispatch-history'] });
+        // 🔥 CRITICAL: Invalidate ALL dispatch-related queries to ensure UI updates
+        // This includes both active dispatches AND history
+        queryClient.invalidateQueries({ queryKey: ['dispatch'] }); // All dispatch queries
+        queryClient.invalidateQueries({ queryKey: ['dispatch-requests'] }); // Active dispatches
+        queryClient.invalidateQueries({ queryKey: ['dispatch', 'history'] }); // History (DELIVERED/CANCELED)
+        queryClient.invalidateQueries({ queryKey: ['dispatch-history'] }); // Legacy key
+        
+        // #region agent log
+        if (typeof window !== 'undefined') {
+          const cache = queryClient.getQueryCache();
+          const historyQueries = cache.findAll({ queryKey: ['dispatch', 'history'] });
+          fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useChatOrdersSocket.ts:onDispatchUpdated:INVALIDATED',message:'Queries invalidated',data:{historyQueriesFound:historyQueries.length,queryKeys:historyQueries.map(q=>q.queryKey)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B,F'})}).catch(()=>{});
+        }
+        // #endregion
         
         // Also invalidate chat-orders as dispatch updates might affect order status
         queryClient.invalidateQueries({ queryKey: ['chat-orders'] });
+        
+        // 🔥 CRITICAL: Invalidate financials when dispatch status changes (especially DELIVERED)
+        // This ensures financials update when order is delivered
+        queryClient.invalidateQueries({ queryKey: ['financials'] });
+        queryClient.invalidateQueries({ queryKey: ['financials-transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['orders', pharmacyId] });
       },
       onTyping: (typing) => {
         console.log('Typing indicator:', typing);

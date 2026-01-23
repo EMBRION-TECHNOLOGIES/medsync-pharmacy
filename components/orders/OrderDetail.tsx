@@ -14,7 +14,8 @@ import { Order } from '@/lib/zod-schemas';
 import { useDispenseOrder } from '@/features/orders/hooks';
 import { socketService } from '@/lib/socketService';
 import { format } from 'date-fns';
-import { Package, User, Calendar } from 'lucide-react';
+import { Package, User, Calendar, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface OrderDetailProps {
   order: Order | null;
@@ -22,8 +23,28 @@ interface OrderDetailProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Safe date formatter — handles ISO strings, Date, timestamps, null/undefined
+function formatDate(date: string | Date | number | null | undefined): string {
+  if (date == null || date === '') return 'N/A';
+  try {
+    const dateObj =
+      typeof date === 'number'
+        ? new Date(date)
+        : typeof date === 'string'
+          ? new Date(date)
+          : date instanceof Date
+            ? date
+            : new Date(String(date));
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return 'N/A';
+    return format(dateObj, 'MMM dd, yyyy HH:mm');
+  } catch {
+    return 'N/A';
+  }
+}
+
 export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
   const dispense = useDispenseOrder();
+  const router = useRouter();
   
   // Join consolidated order room for live updates
   if (order?.id) {
@@ -34,7 +55,8 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
 
   if (!order) return null;
 
-  const canDispense = order.status?.toLowerCase() === 'confirmed';
+  const orderStatus = (order.status || '').toUpperCase();
+  const canDispense = orderStatus === 'CONFIRMED' && orderStatus !== 'PREPARED' && orderStatus !== 'DISPENSED' && orderStatus !== 'DELIVERED';
 
   const handleDispense = () => {
     const items = order.items.map((item) => ({
@@ -42,6 +64,11 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
       qty: item.quantity,
     }));
     dispense.mutate({ id: order.id, items });
+  };
+
+  const handleViewFullDetails = () => {
+    onOpenChange(false); // Close modal first
+    router.push(`/orders/${order.id}`);
   };
 
   return (
@@ -62,11 +89,11 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
-              <Badge>{order.status}</Badge>
+              <Badge>{orderStatus}</Badge>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              {format(new Date(order.createdAt), 'MMM dd, yyyy HH:mm')}
+              {formatDate(order.createdAt)}
             </div>
           </div>
 
@@ -80,8 +107,8 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             </div>
             <div className="pl-6 space-y-1">
               <p className="text-sm">
-                <span className="text-muted-foreground">ID:</span>{' '}
-                {order.patientAlias || order.patientId}
+                <span className="text-muted-foreground">MedSync ID:</span>{' '}
+                {(order as any).patient?.medSyncId || order.patientAlias || '—'}
               </p>
             </div>
           </div>
@@ -124,42 +151,56 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
           <Separator />
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end">
-            {order.status?.toLowerCase() === 'pending' && (
-              <div className="text-sm text-muted-foreground">
-                ⏳ Waiting for patient to confirm order in their mobile app
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 justify-between items-center">
+              <div className="flex-1">
+                {orderStatus === 'PENDING' && (
+                  <div className="text-sm text-muted-foreground">
+                    ⏳ Waiting for patient to confirm order in their mobile app
+                  </div>
+                )}
+                {orderStatus === 'PREPARED' && (
+                  <div className="text-sm text-muted-foreground">
+                    ✨ Order ready on counter — waiting for patient payment (will auto-trigger dispatch)
+                  </div>
+                )}
+                {orderStatus === 'DISPENSED' && (
+                  <div className="text-sm text-muted-foreground">
+                    💊 Dispensed — ready for dispatch
+                  </div>
+                )}
+                {orderStatus === 'OUT_FOR_DELIVERY' && (
+                  <div className="text-sm text-muted-foreground">
+                    🚚 Order is out for delivery
+                  </div>
+                )}
+                {orderStatus === 'DELIVERED' && (
+                  <div className="text-sm text-green-600">
+                    ✅ Order delivered successfully
+                  </div>
+                )}
               </div>
-            )}
-            {canDispense && (
-              <Button
-                onClick={handleDispense}
-                disabled={dispense.isPending}
-                className="ms-gradient"
-              >
-                <Package className="h-4 w-4 mr-2" />
-                Mark as Prepared
-              </Button>
-            )}
-            {order.status?.toLowerCase() === 'prepared' && (
-              <div className="text-sm text-muted-foreground">
-                ✨ Order ready on counter — waiting for patient payment (will auto-trigger dispatch)
+              <div className="flex gap-2">
+                {canDispense && (
+                  <Button
+                    onClick={handleDispense}
+                    disabled={dispense.isPending}
+                    className="ms-gradient"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Mark as Prepared
+                  </Button>
+                )}
+                <Button
+                  onClick={handleViewFullDetails}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Full Details
+                </Button>
               </div>
-            )}
-            {order.status?.toLowerCase() === 'dispensed' && (
-              <div className="text-sm text-muted-foreground">
-                💊 Dispensed — ready for dispatch
-              </div>
-            )}
-            {order.status?.toLowerCase() === 'out_for_delivery' && (
-              <div className="text-sm text-muted-foreground">
-                🚚 Order is out for delivery
-              </div>
-            )}
-            {order.status?.toLowerCase() === 'delivered' && (
-              <div className="text-sm text-green-600">
-                ✅ Order delivered successfully
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </DialogContent>

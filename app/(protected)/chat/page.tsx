@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useChatOrders, useChatMessages, useSendMessage } from '@/features/chat-orders/hooks';
 import { useChatRoomSocket } from '@/features/chat-orders/useChatOrdersSocket';
@@ -21,7 +21,43 @@ export default function ChatPage() {
   const { data: chatOrdersData, isLoading: threadsLoading, error, isError, refetch: refetchChatOrders, isFetching } = useChatOrders({
     status: 'all',
   });
-  const chatRooms = chatOrdersData?.rooms || [];
+
+  // Deduplicate chat rooms by patient ID (keep the one with the latest message)
+  const chatRooms = useMemo(() => {
+    const rooms = chatOrdersData?.rooms || [];
+    const patientRoomMap = new Map<string, ChatRoom>();
+
+    for (const room of rooms) {
+      const patientParticipant = room.participants.find(
+        p => p.type === 'PATIENT' || p.type === 'patient'
+      );
+      const patientId = patientParticipant?.id || room.id;
+
+      const existingRoom = patientRoomMap.get(patientId);
+      if (!existingRoom) {
+        patientRoomMap.set(patientId, room);
+      } else {
+        // Keep the room with the more recent lastMessage
+        const existingDate = existingRoom.lastMessage?.createdAt
+          ? new Date(existingRoom.lastMessage.createdAt).getTime()
+          : 0;
+        const currentDate = room.lastMessage?.createdAt
+          ? new Date(room.lastMessage.createdAt).getTime()
+          : 0;
+
+        if (currentDate > existingDate) {
+          patientRoomMap.set(patientId, room);
+        }
+      }
+    }
+
+    // Return deduped rooms sorted by last message date
+    return Array.from(patientRoomMap.values()).sort((a, b) => {
+      const aDate = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const bDate = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [chatOrdersData?.rooms]);
   
   // Refetch when location changes
   useEffect(() => {

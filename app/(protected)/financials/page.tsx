@@ -41,7 +41,9 @@ import {
   AlertCircle,
   Trash2,
   User,
-  RefreshCw
+  RefreshCw,
+  Info,
+  Calendar
 } from 'lucide-react';
 import { useOrg } from '@/store/useOrg';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
@@ -49,6 +51,8 @@ import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { RoleGuard } from '@/components/auth/RoleGuard';
+import { useChatOrdersSocket } from '@/features/chat-orders/useChatOrdersSocket';
+import { useEffect } from 'react';
 
 interface FinancialSummary {
   totalRevenue: number;
@@ -141,8 +145,28 @@ export default function FinancialsPage() {
   const { pharmacyId, locationId, locationName } = useOrg();
   const { roleType } = usePharmacyContext();
   const queryClient = useQueryClient();
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [dateRange, setDateRange] = useState<'1d' | '7d' | '30d' | '90d' | 'all' | 'custom'>('30d');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
+
+  // 🔥 Listen to socket events to auto-refresh financials when orders change
+  useChatOrdersSocket();
+  
+  // Auto-refresh financials when order/dispatch status changes
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.type === 'updated' && 
+          (event.query.queryKey[0] === 'orders' || 
+           event.query.queryKey[0] === 'dispatch' ||
+           event.query.queryKey[0] === 'chat-orders')) {
+        // Order or dispatch updated - refresh financials
+        queryClient.invalidateQueries({ queryKey: ['financials', pharmacyId, locationId] });
+        queryClient.invalidateQueries({ queryKey: ['financials-transactions', pharmacyId, locationId] });
+      }
+    });
+    return () => unsubscribe();
+  }, [queryClient, pharmacyId, locationId]);
   const [accountForm, setAccountForm] = useState({
     bankCode: '',
     bankName: '',
@@ -155,27 +179,27 @@ export default function FinancialsPage() {
 
   // Fetch financial data from API - includes locationId in query key for automatic refetch
   const { data: financialData, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['financials', pharmacyId, locationId, dateRange],
+    queryKey: ['financials', pharmacyId, locationId, dateRange, customStart, customEnd],
     queryFn: async (): Promise<FinancialData> => {
-      // locationId is automatically sent via X-Location-Id header by api interceptor
-      const response = await api.get(`/pharmacy/financials?range=${dateRange}`);
-      
-      // The API interceptor may or may not unwrap the response
-      // Handle both cases: { summary, ... } or { success: true, data: { summary, ... } }
+      const params = new URLSearchParams();
+      if (dateRange === 'custom' && customStart && customEnd) {
+        params.set('startDate', customStart);
+        params.set('endDate', customEnd);
+      } else {
+        params.set('range', dateRange);
+      }
+      const response = await api.get(`/pharmacy/financials?${params.toString()}`);
       let data = response.data;
-      
-      // If response has success field, it wasn't unwrapped
       if (data && typeof data === 'object' && 'success' in data) {
         data = data.data;
       }
-      
       if (!data || typeof data !== 'object' || !data.summary) {
         console.error('Invalid financials response structure:', { responseData: response.data, extractedData: data });
         throw new Error('Invalid response structure');
       }
       return data as FinancialData;
     },
-    enabled: !!pharmacyId,
+    enabled: !!pharmacyId && (dateRange !== 'custom' || (!!customStart && !!customEnd)),
     retry: 1,
   });
 
@@ -260,13 +284,15 @@ export default function FinancialsPage() {
     }
 
     // Create CSV content
-    const headers = ['Order Number', 'Date', 'Customer TeraSync ID', 'Amount (NGN)', 'Status'];
+    const headers = ['Order Number', 'Date', 'Customer TeraSync ID', 'Medication Amount (NGN)', 'Settlement Status'];
+    const settlementLabel = (s: string) =>
+      s === 'completed' ? 'Earned' : s === 'cancelled' ? 'Cancelled' : 'Awaiting Delivery';
     const rows = transactions.map((t: Transaction) => [
       t.orderNumber || t.description,
       format(new Date(t.date), 'yyyy-MM-dd HH:mm'),
       t.customerMedSyncId || 'N/A',
       t.amount.toString(),
-      t.status,
+      settlementLabel(t.status),
     ]);
 
     const csvContent = [
@@ -360,23 +386,55 @@ export default function FinancialsPage() {
             }
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <div className="flex border rounded-md">
-            {(['7d', '30d', '90d', 'all'] as const).map((range) => (
+            {(['1d', '7d', '30d', '90d', 'all'] as const).map((range) => (
               <Button
                 key={range}
                 variant={dateRange === range ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setDateRange(range)}
+                onClick={() => {
+                  setDateRange(range);
+                  setCustomStart('');
+                  setCustomEnd('');
+                }}
                 className="rounded-none first:rounded-l-md last:rounded-r-md"
               >
-                {range === '7d' ? '7D' : range === '30d' ? '30D' : range === '90d' ? '90D' : 'All'}
+                {range === '1d' ? '1D' : range === '7d' ? '7D' : range === '30d' ? '30D' : range === '90d' ? '90D' : 'All'}
               </Button>
             ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="h-8 w-[130px]"
+            />
+            <span className="text-muted-foreground text-sm">–</span>
+            <Input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="h-8 w-[130px]"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (customStart && customEnd) {
+                  setDateRange('custom');
+                }
+              }}
+              disabled={!customStart || !customEnd}
+            >
+              Apply
+            </Button>
           </div>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
@@ -385,29 +443,62 @@ export default function FinancialsPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Banner — medication revenue only */}
+      <p className="text-sm text-muted-foreground">
+        Amounts shown reflect medication revenue only. Delivery fees and service charges are managed by TeraSync.
+      </p>
+
+      {/* Summary Cards — production-ready copy */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Delivered Earnings</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(data.summary.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              {data.summary.revenueChange >= 0 ? (
-                <>
-                  <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                  <span className="text-green-500">+{data.summary.revenueChange}%</span>
-                </>
-              ) : (
-                <>
-                  <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                  <span className="text-red-500">{data.summary.revenueChange}%</span>
-                </>
-              )}
-              <span className="ml-1">vs previous period</span>
-            </p>
+            {data.summary.totalRevenue === 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground mt-1">No delivered orders yet.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Revenue appears here once orders are delivered.</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Medication revenue from delivered orders.</p>
+            )}
+            {data.summary.revenueChange != null && data.summary.totalRevenue > 0 && (
+              <p className="text-xs text-muted-foreground flex items-center mt-1">
+                {data.summary.revenueChange >= 0 ? (
+                  <>
+                    <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                    <span className="text-green-500">+{data.summary.revenueChange}%</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                    <span className="text-red-500">{data.summary.revenueChange}%</span>
+                  </>
+                )}
+                <span className="ml-1">vs previous period</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Paid (Awaiting Delivery)</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(data.summary.pendingRevenue)}</div>
+            {data.summary.pendingRevenue === 0 && data.summary.pendingOrders === 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground mt-1">No paid orders at the moment.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Paid orders awaiting delivery will appear here.</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Paid orders pending delivery.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -418,38 +509,21 @@ export default function FinancialsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.summary.totalOrders}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {data.summary.cancelledOrders > 0 && (
-                <span className="text-red-500">{data.summary.cancelledOrders} cancelled</span>
-              )}
-              {data.summary.cancelledOrders === 0 && 'No cancellations'}
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Orders successfully delivered.</p>
+            {data.summary.cancelledOrders > 0 && (
+              <p className="text-xs text-red-500 mt-1">{data.summary.cancelledOrders} cancelled</p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Order Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Average Order Value</CardTitle>
             <PiggyBank className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(data.summary.averageOrderValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per completed order
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.summary.pendingRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {data.summary.pendingOrders} orders being processed
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Average medication value per delivered order.</p>
           </CardContent>
         </Card>
       </div>
@@ -473,68 +547,77 @@ export default function FinancialsPage() {
               {transactions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No orders yet</p>
+                  <p>No paid orders at the moment.</p>
+                  <p className="text-sm mt-2">Paid orders awaiting delivery will appear here.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {transactions.map((transaction: Transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-full ${
-                          transaction.status === 'completed'
-                            ? 'bg-green-100 text-green-600' 
-                            : transaction.status === 'cancelled'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-yellow-100 text-yellow-600'
-                        }`}>
-                          {transaction.status === 'completed' ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : transaction.status === 'cancelled' ? (
-                            <XCircle className="h-4 w-4" />
-                          ) : (
-                            <Clock className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">#{transaction.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(transaction.date), 'MMM d, yyyy • h:mm a')}
-                          </p>
-                          {/* Customer MedSync ID */}
-                          <div className="flex items-center gap-1 mt-1">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs font-mono text-primary">
-                              {transaction.customerMedSyncId || 'Unknown'}
-                            </span>
+                <>
+                  <div className="flex items-center justify-between px-4 pb-2 text-xs font-medium text-muted-foreground">
+                    <div className="w-[280px]" />
+                    <div className="flex items-center gap-4 text-right">
+                      <span className="flex items-center gap-1">
+                        Medication Amount
+                        <span title="Delivery fees and service charges are handled by TeraSync." className="cursor-help">
+                          <Info className="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                      <span className="w-28">Settlement Status</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {transactions.map((transaction: Transaction) => {
+                      const settlement = transaction.status === 'completed'
+                        ? { label: 'Earned', tooltip: 'Delivered', variant: 'default' as const, className: 'bg-green-100 text-green-600' }
+                        : transaction.status === 'cancelled'
+                          ? { label: 'Cancelled', tooltip: 'Not payable', variant: 'destructive' as const, className: 'bg-red-100 text-red-600' }
+                          : { label: 'Awaiting Delivery', tooltip: 'Paid, delivery pending', variant: 'secondary' as const, className: 'bg-yellow-100 text-yellow-600' };
+                      return (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`p-2 rounded-full ${settlement.className}`}>
+                              {transaction.status === 'completed' ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : transaction.status === 'cancelled' ? (
+                                <XCircle className="h-4 w-4" />
+                              ) : (
+                                <Clock className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium">#{transaction.orderNumber}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(transaction.date), 'MMM d, yyyy • h:mm a')}
+                              </p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs font-mono text-primary">
+                                  {transaction.customerMedSyncId || 'Unknown'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-right">
+                            <p className={`font-semibold ${
+                              transaction.status === 'completed'
+                                ? 'text-green-600'
+                                : transaction.status === 'cancelled'
+                                  ? 'text-red-600 line-through'
+                                  : 'text-yellow-600'
+                            }`}>
+                              {formatCurrency(transaction.amount)}
+                            </p>
+                            <Badge variant={settlement.variant} title={settlement.tooltip} className="w-28 justify-center">
+                              {settlement.label}
+                            </Badge>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${
-                          transaction.status === 'completed' 
-                            ? 'text-green-600' 
-                            : transaction.status === 'cancelled'
-                              ? 'text-red-600 line-through'
-                              : 'text-yellow-600'
-                        }`}>
-                          {formatCurrency(transaction.amount)}
-                        </p>
-                        <Badge variant={
-                          transaction.status === 'completed' 
-                            ? 'default' 
-                            : transaction.status === 'cancelled'
-                              ? 'destructive'
-                              : 'secondary'
-                        }>
-                          {transaction.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
               {transactions.length > 0 && (
                 <div className="mt-4 text-center">
@@ -661,6 +744,10 @@ export default function FinancialsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <p className="text-xs text-muted-foreground pt-2">
+        Pharmacies see medication revenue only. Full transaction breakdowns are available to administrators.
+      </p>
 
       {/* Add Payout Account Dialog - Only for Owner */}
       {isOwner && (

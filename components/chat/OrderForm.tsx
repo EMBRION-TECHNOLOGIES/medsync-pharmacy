@@ -78,35 +78,6 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
     return total + price;
   }, 0);
 
-  // SIMPLE TEST FUNCTION - Bypass all validation
-  const testOrderCreation = async () => {
-    try {
-      console.log('=== TESTING WITH HARDCODED DATA ===');
-      const testData = {
-        drugName: "Paracetamol 500mg",
-        quantity: 20,
-        dosageSig: "2 tablets every 6 hours",
-        priceNgn: 2000
-      };
-      
-      console.log('Test data:', JSON.stringify(testData, null, 2));
-      console.log('Data types:', {
-        drugName: typeof testData.drugName,
-        quantity: typeof testData.quantity,
-        dosageSig: typeof testData.dosageSig,
-        priceNgn: typeof testData.priceNgn
-      });
-      
-      const order = await ordersService.createOrder(roomId, testData);
-      console.log('SUCCESS! Order created:', order);
-      toast.success('Test order created successfully!');
-    } catch (error: any) {
-      console.error('TEST FAILED:', error);
-      console.error('Error response:', error.response?.data);
-      toast.error(`Test failed: ${error.response?.data?.message || error.message}`);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -440,34 +411,20 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
               <span className="font-medium">Total Medication Price:</span>
               <span className="text-lg font-bold">₦{totalMedicationPrice.toLocaleString()}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Patient will see additional delivery & processing fees when they view the order in their mobile app.
-            </p>
           </div>
 
-          <div className="flex justify-between gap-2">
+          <div className="flex justify-end gap-2">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={testOrderCreation}
+              onClick={() => setOpen(false)}
               disabled={loading}
-              className="text-xs"
             >
-              🧪 Test API
+              Cancel
             </Button>
-            <div className="flex gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setOpen(false)}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} onClick={handleSubmit}>
-                {loading ? 'Creating...' : 'Create Order'}
-              </Button>
-            </div>
+            <Button type="submit" disabled={loading} onClick={handleSubmit}>
+              {loading ? 'Creating...' : 'Create Order'}
+            </Button>
           </div>
         </div>
       </DialogContent>

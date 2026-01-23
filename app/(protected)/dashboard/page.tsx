@@ -20,10 +20,15 @@ import {
   Activity,
   DollarSign,
   ShoppingCart,
-  ChevronRight
+  ChevronRight,
+  Info,
+  Wallet,
+  CreditCard
 } from 'lucide-react';
 import { useDashboard } from '@/features/pharmacy/hooks';
 import { useChatOrders } from '@/features/chat-orders/hooks';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useChatOrdersSocket } from '@/features/chat-orders/useChatOrdersSocket';
 import { useOrg } from '@/store/useOrg';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
@@ -52,6 +57,7 @@ function StatCard({
   title, 
   value, 
   subtitle,
+  tooltip,
   icon: Icon, 
   trend,
   trendValue,
@@ -61,6 +67,7 @@ function StatCard({
   title: string;
   value: string | number;
   subtitle?: string;
+  tooltip?: string;
   icon: LucideIcon;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
@@ -84,7 +91,14 @@ function StatCard({
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              {tooltip && (
+                <span title={tooltip} className="cursor-help text-muted-foreground hover:text-foreground">
+                  <Info className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </div>
             <p className="text-2xl font-bold">{value}</p>
             {subtitle && (
               <p className="text-xs text-muted-foreground">{subtitle}</p>
@@ -133,7 +147,7 @@ function OrderStatusCard({ status, count, icon: Icon, color, onClick }: {
 }
 
 export default function DashboardPage() {
-  const { locationName } = useOrg();
+  const { locationName, pharmacyId } = useOrg();
   const { roleType } = usePharmacyContext();
   const router = useRouter();
   
@@ -142,6 +156,18 @@ export default function DashboardPage() {
   
   // Fetch dashboard data
   const { data: dashboardData, isLoading, error, refetch } = useDashboard();
+
+  // Fetch financials for owner (30d) — used for Delivered Earnings, Paid Awaiting Delivery, Orders Awaiting Delivery
+  const { data: financialsData } = useQuery({
+    queryKey: ['financials-dashboard', pharmacyId, '30d'],
+    queryFn: async () => {
+      const res = await api.get('/pharmacy/financials?range=30d');
+      const d = res.data?.data ?? res.data;
+      return d?.summary ? d : null;
+    },
+    enabled: !!pharmacyId && isOwner,
+  });
+  const summary = financialsData?.summary;
   
   // Use socket for real-time updates
   useChatOrdersSocket();
@@ -273,41 +299,103 @@ export default function DashboardPage() {
 
       {/* Key Metrics */}
       <div className={`grid gap-4 md:grid-cols-2 ${isOwner ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
-        {/* Revenue - Owner Only */}
+        {/* Financial Summary (Owner only) — production-ready copy */}
         {isOwner && (
-          <StatCard
-            title="Today's Revenue"
-            value={formatCurrency(stats?.revenue?.today || 0)}
-            subtitle={`Avg order: ${formatCurrency(stats?.revenue?.avgOrderValue || 0)}`}
-            icon={DollarSign}
-            color="green"
-            onClick={() => router.push('/financials')}
-          />
+          <>
+            <StatCard
+              title="Delivered Earnings"
+              value={formatCurrency(summary?.totalRevenue ?? 0)}
+              subtitle="Money earned from completed deliveries."
+              tooltip="Includes medication revenue from orders marked Delivered. This amount counts as earned."
+              icon={DollarSign}
+              color="green"
+              onClick={() => router.push('/financials')}
+            />
+            <StatCard
+              title="Paid (Awaiting Delivery)"
+              value={formatCurrency(summary?.pendingRevenue ?? 0)}
+              subtitle="Orders already paid by customers, awaiting delivery."
+              tooltip="Customers have paid, but delivery is not yet complete. This amount becomes earned once delivery is completed."
+              icon={Wallet}
+              color="yellow"
+              onClick={() => router.push('/financials')}
+            />
+            <StatCard
+              title="Orders Awaiting Delivery"
+              value={summary?.pendingOrders ?? 0}
+              subtitle="Paid orders not yet delivered."
+              tooltip="Includes confirmed, prepared, dispensed, and in-transit orders."
+              icon={Package}
+              color="orange"
+              onClick={() => router.push('/financials')}
+            />
+            <StatCard
+              title="Paid Today"
+              value={formatCurrency(stats?.revenue?.today ?? 0)}
+              subtitle="Orders paid today (informational)."
+              tooltip="Shows medication value of orders paid today, regardless of delivery status. This is not the same as earned revenue."
+              icon={CreditCard}
+              color="blue"
+              onClick={() => router.push('/financials')}
+            />
+          </>
         )}
-        <StatCard
-          title="Orders Today"
-          value={stats?.orders?.today || 0}
-          subtitle={`${stats?.orders?.thisWeek || 0} this week`}
-          icon={ShoppingCart}
-          color="blue"
-          onClick={() => router.push('/orders')}
-        />
-        <StatCard
-          title="Active Dispatches"
-          value={stats?.dispatches?.active || 0}
-          subtitle={`${stats?.dispatches?.completedThisMonth || 0} delivered this month`}
-          icon={Truck}
-          color="orange"
-          onClick={() => router.push('/dispatch')}
-        />
-        <StatCard
-          title="Active Chats"
-          value={sortedThreads?.length || 0}
-          subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-          icon={MessageSquare}
-          color={unreadCount > 0 ? 'green' : 'primary'}
-          onClick={() => router.push('/chat')}
-        />
+        {!isOwner && (
+          <>
+            <StatCard
+              title="Orders Today"
+              value={stats?.orders?.today || 0}
+              subtitle={`${stats?.orders?.thisWeek || 0} this week`}
+              icon={ShoppingCart}
+              color="blue"
+              onClick={() => router.push('/orders')}
+            />
+            <StatCard
+              title="Active Dispatches"
+              value={stats?.dispatches?.active || 0}
+              subtitle={`${stats?.dispatches?.completedThisMonth || 0} delivered this month`}
+              icon={Truck}
+              color="orange"
+              onClick={() => router.push('/dispatch')}
+            />
+            <StatCard
+              title="Active Chats"
+              value={sortedThreads?.length || 0}
+              subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+              icon={MessageSquare}
+              color={unreadCount > 0 ? 'green' : 'primary'}
+              onClick={() => router.push('/chat')}
+            />
+          </>
+        )}
+        {isOwner && (
+          <>
+            <StatCard
+              title="Orders Today"
+              value={stats?.orders?.today || 0}
+              subtitle={`${stats?.orders?.thisWeek || 0} this week`}
+              icon={ShoppingCart}
+              color="blue"
+              onClick={() => router.push('/orders')}
+            />
+            <StatCard
+              title="Active Dispatches"
+              value={stats?.dispatches?.active || 0}
+              subtitle={`${stats?.dispatches?.completedThisMonth || 0} delivered this month`}
+              icon={Truck}
+              color="orange"
+              onClick={() => router.push('/dispatch')}
+            />
+            <StatCard
+              title="Active Chats"
+              value={sortedThreads?.length || 0}
+              subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+              icon={MessageSquare}
+              color={unreadCount > 0 ? 'green' : 'primary'}
+              onClick={() => router.push('/chat')}
+            />
+          </>
+        )}
       </div>
 
       {/* Order Status Overview */}
@@ -524,14 +612,15 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Revenue Summary - Owner Only */}
+          {/* Sales Summary - Owner Only (medication sales only, excludes delivery & service fees) */}
           {isOwner && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  Revenue Summary
+                  Medication Sales
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">Your earnings from medication sales</p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">

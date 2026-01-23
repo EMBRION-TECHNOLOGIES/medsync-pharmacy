@@ -443,17 +443,20 @@ export const ordersService = {
 
   async updateOrderStatus(id: string, status: OrderStatus, notes?: string): Promise<Order> {
     const response = await api.patch(`/chat-orders/${id}/status`, { status, notes });
-    return response.data.order;
+    // API interceptor unwraps { success: true, data: order } to just the order object
+    return response.data;
   },
 
   async dispenseOrder(id: string, notes?: string): Promise<Order> {
     const response = await api.post(`/chat-orders/${id}/dispense`, { notes });
-    return response.data.order;
+    // API interceptor unwraps { success: true, data: order } to just the order object
+    return response.data;
   },
 
   async cancelOrder(id: string, reason: string): Promise<Order> {
     const response = await api.post(`/chat-orders/${id}/cancel`, { reason });
-    return response.data.order;
+    // API interceptor unwraps { success: true, data: order } to just the order object
+    return response.data;
   },
 
   async getUserOrders(filters: OrderFilters = {}): Promise<OrderListResponse> {

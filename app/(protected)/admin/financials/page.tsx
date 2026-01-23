@@ -37,6 +37,7 @@ import {
   Send,
   CheckCircle,
   History,
+  Truck,
 } from 'lucide-react';
 import {
   Dialog,
@@ -54,13 +55,37 @@ interface FinancialSummary {
     end: string;
   };
   summary: {
+    // Money In
+    customerPayments?: number;
     grossVolume: number;
+    
+    // Money Out (Liabilities)
+    pharmacyPayoutsOwed?: number;
+    deliveryFeesOwed?: number;
+    paystackFees?: number;
+    totalFundsOwed?: number;
+    
+    // Money Kept (TeraSync Revenue)
+    terasyncGrossFees?: number;
+    terasyncNetRevenue?: number;
+    
+    // Legacy aliases (backward compatibility)
     platformFees: number;
+    platformRevenue: number;
     deliveryFees: number;
+    deliveryLiability: number;
+    pharmacyLiability: number;
     netPayable: number;
+    gatewayCost: number;
+    
+    // Funds In Limbo
+    fundsPendingDelivery?: number;
+    pendingPayments: number;
+    
+    // Metadata
     totalOrders: number;
     paidOrders: number;
-    pendingPayments: number;
+    legacyOrders: number;
     currency: string;
   };
   pharmacyBreakdown: Array<{
@@ -168,6 +193,7 @@ export default function AdminFinancialsPage() {
   const [selectedPayout, setSelectedPayout] = useState<PendingPayout | null>(null);
   const [showPayoutDialog, setShowPayoutDialog] = useState(false);
   const [payoutNotes, setPayoutNotes] = useState('');
+  const [showOrderBreakdown, setShowOrderBreakdown] = useState(false);
 
   const { data: summary, isLoading: summaryLoading, refetch, isFetching } = useQuery<FinancialSummary>({
     queryKey: ['admin', 'financials', 'summary', { startDate, endDate }],
@@ -195,6 +221,37 @@ export default function AdminFinancialsPage() {
     queryKey: ['admin', 'financials', 'payouts', 'pending'],
     queryFn: async () => {
       const response = await api.get('/admin/financials/payouts/pending');
+      return response.data?.data || response.data;
+    },
+  });
+
+  const { data: orderTransactionsData, isLoading: orderTransactionsLoading } = useQuery<{
+    transactions: Array<{
+      id: string;
+      orderCode: string;
+      createdAt: string;
+      paymentStatus: string;
+      status: string;
+      pharmacy: { id: string; name: string } | null;
+      patient: { id: string; name: string; medSyncId: string } | null;
+      breakdown: {
+        total: number;
+        medication: number;
+        delivery: number;
+        serviceCharge: number;
+        platformFee: number;
+        gatewayFee: number;
+        hasBreakdown?: boolean; // Flag indicating if breakdown exists
+      };
+    }>;
+    pagination: { total: number; limit: number; offset: number; hasMore: boolean };
+  }>({
+    queryKey: ['admin', 'financials', 'orders', { startDate, endDate }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      const response = await api.get(`/admin/financials/orders?${params.toString()}`);
       return response.data?.data || response.data;
     },
   });
@@ -359,36 +416,149 @@ export default function AdminFinancialsPage() {
           </div>
         ) : (
           <>
-            {/* Summary Stats */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                title="Gross Volume"
-                value={formatCurrency(summary?.summary.grossVolume || 0, summary?.summary.currency)}
-                icon={TrendingUp}
-                variant="success"
-                description={`${summary?.summary.totalOrders || 0} orders`}
-              />
-              <StatCard
-                title="Platform Fees"
-                value={formatCurrency(summary?.summary.platformFees || 0, summary?.summary.currency)}
-                icon={DollarSign}
-                description="5% of gross"
-              />
-              <StatCard
-                title="Net Payable"
-                value={formatCurrency(summary?.summary.netPayable || 0, summary?.summary.currency)}
-                icon={Wallet}
-                variant="success"
-                description="To pharmacies"
-              />
-              <StatCard
-                title="Pending Payments"
-                value={formatCurrency(summary?.summary.pendingPayments || 0, summary?.summary.currency)}
-                icon={CreditCard}
-                variant={summary?.summary.pendingPayments ? 'warning' : 'default'}
-                description={`${(summary?.summary.totalOrders || 0) - (summary?.summary.paidOrders || 0)} unpaid`}
-              />
+            {/* SECTION 1 — MONEY IN */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Money In</h2>
+              <div className="grid gap-4 md:grid-cols-1">
+                <StatCard
+                  title="Customer Payments"
+                  value={formatCurrency(summary?.summary.customerPayments || summary?.summary.grossVolume || 0, summary?.summary.currency)}
+                  icon={TrendingUp}
+                  variant="success"
+                  description={`Total amount paid by customers. Includes: Medication + Delivery + Platform fees. ${summary?.summary.totalOrders || 0} orders.`}
+                />
+              </div>
             </div>
+
+            {/* SECTION 2 — MONEY OUT (Liabilities) */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Money Out (Liabilities)</h2>
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatCard
+                  title="Pharmacy Payouts Owed"
+                  value={formatCurrency(summary?.summary.pharmacyPayoutsOwed || summary?.summary.netPayable || 0, summary?.summary.currency)}
+                  icon={Wallet}
+                  variant="default"
+                  description="Medication revenue payable to pharmacies. Delivered orders only. Medication value. Excludes delivery & fees."
+                />
+                <StatCard
+                  title="Delivery Fees Owed"
+                  value={formatCurrency(summary?.summary.deliveryFeesOwed || summary?.summary.deliveryFees || 0, summary?.summary.currency)}
+                  icon={Truck}
+                  variant="default"
+                  description="Amounts payable to delivery partners (Kwik, etc.). Completed deliveries. Dispatch fees only."
+                />
+                <StatCard
+                  title="Payment Gateway Fees"
+                  value={formatCurrency(summary?.summary.paystackFees || summary?.summary.gatewayCost || 0, summary?.summary.currency)}
+                  icon={CreditCard}
+                  variant="default"
+                  description="Transaction fees charged by Paystack. 1.5% + ₦100 per transaction (capped at ₦2,000). Automatically deducted at settlement."
+                />
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg border">
+                <p className="text-sm font-medium">
+                  Total Funds Owed = {formatCurrency(
+                    (summary?.summary.totalFundsOwed || 
+                     (summary?.summary.pharmacyPayoutsOwed || summary?.summary.netPayable || 0) +
+                     (summary?.summary.deliveryFeesOwed || summary?.summary.deliveryFees || 0) +
+                     (summary?.summary.paystackFees || summary?.summary.gatewayCost || 0)
+                    ), summary?.summary.currency
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  These funds do not belong to TeraSync.
+                </p>
+              </div>
+            </div>
+
+            {/* SECTION 3 — MONEY KEPT (TeraSync Revenue) */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Money Kept (TeraSync Earnings)</h2>
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatCard
+                  title="Platform Fees (Gross)"
+                  value={formatCurrency(summary?.summary.terasyncGrossFees || summary?.summary.platformFees || 0, summary?.summary.currency)}
+                  icon={DollarSign}
+                  variant="default"
+                  description="Service fees charged by TeraSync before processing costs. TeraSync service charge on orders. Excludes Paystack deductions."
+                />
+                <StatCard
+                  title="Less: Paystack Fees"
+                  value={formatCurrency(summary?.summary.paystackFees || summary?.summary.gatewayCost || 0, summary?.summary.currency)}
+                  icon={CreditCard}
+                  variant="default"
+                  description="Processing fees deducted by Paystack."
+                />
+                <StatCard
+                  title="TeraSync Net Revenue"
+                  value={formatCurrency(summary?.summary.terasyncNetRevenue || ((summary?.summary.platformFees || 0) - (summary?.summary.gatewayCost || 0)), summary?.summary.currency)}
+                  icon={DollarSign}
+                  variant="success"
+                  description="Actual platform earnings after all deductions. Formula: Platform Fees − Paystack Fees. This is the number that matters."
+                />
+              </div>
+            </div>
+
+            {/* SECTION 4 — FUNDS IN LIMBO */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Funds In Limbo</h2>
+              <div className="grid gap-4 md:grid-cols-1">
+                <StatCard
+                  title="Funds Pending Delivery"
+                  value={formatCurrency(summary?.summary.fundsPendingDelivery || summary?.summary.pendingPayments || 0, summary?.summary.currency)}
+                  icon={CreditCard}
+                  variant={summary?.summary.fundsPendingDelivery || summary?.summary.pendingPayments ? 'warning' : 'default'}
+                  description="Customer payments for orders not yet delivered. These funds are not yet earned by any party."
+                />
+              </div>
+            </div>
+
+            {/* VISUAL SUMMARY — Money Flow Diagram */}
+            <Card className="bg-muted/30">
+              <CardHeader>
+                <CardTitle className="text-base">Money Flow Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 font-mono text-sm">
+                  <div className="text-center font-semibold text-lg">
+                    {formatCurrency(summary?.summary.customerPayments || summary?.summary.grossVolume || 0, summary?.summary.currency)}
+                  </div>
+                  <div className="text-center text-muted-foreground mb-4">
+                    Customer Payments
+                  </div>
+                  <div className="text-center mb-2">
+                    <ArrowUpRight className="h-5 w-5 mx-auto text-muted-foreground" />
+                  </div>
+                  <div className="border rounded-lg p-4 space-y-2 bg-background">
+                    <div className="flex justify-between items-center">
+                      <span>Pharmacy Payouts</span>
+                      <span className="font-semibold">
+                        {formatCurrency(summary?.summary.pharmacyPayoutsOwed || summary?.summary.netPayable || 0, summary?.summary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Delivery Partner Fees</span>
+                      <span className="font-semibold">
+                        {formatCurrency(summary?.summary.deliveryFeesOwed || summary?.summary.deliveryFees || 0, summary?.summary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Paystack Fees</span>
+                      <span className="font-semibold">
+                        {formatCurrency(summary?.summary.paystackFees || summary?.summary.gatewayCost || 0, summary?.summary.currency)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t font-semibold text-emerald-600">
+                      <span>TeraSync Net Revenue</span>
+                      <span>
+                        {formatCurrency(summary?.summary.terasyncNetRevenue || ((summary?.summary.platformFees || 0) - (summary?.summary.gatewayCost || 0)), summary?.summary.currency)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Patient Wallet Overview */}
             <Card>
@@ -504,7 +674,7 @@ export default function AdminFinancialsPage() {
                   Pharmacy Breakdown
                 </CardTitle>
                 <CardDescription>
-                  Revenue by pharmacy for the selected period
+                  Medication sales by pharmacy (what pharmacies earn, excluding delivery & service fees)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -515,9 +685,9 @@ export default function AdminFinancialsPage() {
                         <TableRow>
                           <TableHead>Pharmacy</TableHead>
                           <TableHead className="text-right">Orders</TableHead>
-                          <TableHead className="text-right">Gross Volume</TableHead>
+                          <TableHead className="text-right">Customer Paid (Total)</TableHead>
                           <TableHead className="text-right">Platform Fee</TableHead>
-                          <TableHead className="text-right">Net Payable</TableHead>
+                          <TableHead className="text-right">Pharmacy Earnings</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -631,6 +801,132 @@ export default function AdminFinancialsPage() {
                   </div>
                 )}
               </CardContent>
+            </Card>
+
+            {/* SECTION 5 — ORDER-LEVEL BREAKDOWN (Collapsible, Advanced) */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Order-Level Breakdown
+                    </CardTitle>
+                    <CardDescription>
+                      Auditing, disputes, investigations — not daily use. Detailed breakdown of each order.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowOrderBreakdown(!showOrderBreakdown)}
+                  >
+                    {showOrderBreakdown ? 'Collapse' : 'Expand'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showOrderBreakdown && (
+                <CardContent>
+                  {orderTransactionsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : orderTransactionsData?.transactions && orderTransactionsData.transactions.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order</TableHead>
+                          <TableHead className="text-right">Customer Paid</TableHead>
+                          <TableHead>Pharmacy</TableHead>
+                          <TableHead className="text-right">Delivery</TableHead>
+                          <TableHead className="text-right">TeraSync</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orderTransactionsData.transactions.map((tx) => (
+                          <TableRow key={tx.id}>
+                            <TableCell>
+                              <div>
+                                <span className="font-mono text-sm font-medium">{tx.orderCode}</span>
+                                <div className="text-xs text-muted-foreground">
+                                  {format(new Date(tx.createdAt), 'MMM d, h:mm a')}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {formatCurrency(tx.breakdown.total, summary?.summary.currency)}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                {tx.pharmacy ? (
+                                  <span className="text-sm">{tx.pharmacy.name}</span>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Unknown</span>
+                                )}
+                                {tx.breakdown.hasBreakdown !== false && (
+                                  <div className="text-xs text-emerald-600 mt-0.5">
+                                    {formatCurrency(tx.breakdown.medication, summary?.summary.currency)}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-blue-600">
+                              {tx.breakdown.hasBreakdown === false ? (
+                                <span className="text-xs text-muted-foreground italic">Pending</span>
+                              ) : (
+                                formatCurrency(tx.breakdown.delivery, summary?.summary.currency)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {tx.breakdown.hasBreakdown === false ? (
+                                <span className="text-xs text-muted-foreground italic">Pending</span>
+                              ) : (
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    {formatCurrency(tx.breakdown.platformFee, summary?.summary.currency)}
+                                  </div>
+                                  {tx.breakdown.gatewayFee > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                      -{formatCurrency(tx.breakdown.gatewayFee, summary?.summary.currency)} (Paystack)
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  tx.paymentStatus === 'PAID' || tx.paymentStatus === 'paid' || tx.paymentStatus === 'success'
+                                    ? 'default'
+                                    : tx.paymentStatus === 'pending'
+                                    ? 'secondary'
+                                    : 'destructive'
+                                }
+                              >
+                                {tx.paymentStatus}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {orderTransactionsData.pagination.hasMore && (
+                      <div className="mt-4 text-center text-sm text-muted-foreground">
+                        Showing {orderTransactionsData.transactions.length} of {orderTransactionsData.pagination.total} transactions
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No order transactions found for this period</p>
+                    <p className="text-xs mt-2">Only orders with payment breakdown are shown</p>
+                  </div>
+                )}
+                </CardContent>
+              )}
             </Card>
 
             {/* Pending Payouts */}
@@ -799,6 +1095,112 @@ export default function AdminFinancialsPage() {
               </CardContent>
             </Card>
 
+            {/* SECTION 6 — PATIENT WALLETS (Custodial Money, Not Revenue) */}
+            <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Patient Wallets
+                </CardTitle>
+                <CardDescription>
+                  Custodial money — not revenue. Pre-loaded funds held in patient accounts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {walletLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : walletData ? (
+                  <div className="space-y-6">
+                    {/* Wallet Stats */}
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-emerald-600">
+                          {formatCurrency(walletData.overview.totalBalance, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Total Balance</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Across {walletData.overview.walletCount} wallets
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(walletData.thisWeek.deposits.amount, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Deposits This Week</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {walletData.thisWeek.deposits.count} transactions
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold">
+                          {walletData.thisWeek.transactions}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Transactions This Week</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold">
+                          {formatCurrency(walletData.overview.averageBalance, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Average Balance</p>
+                      </div>
+                    </div>
+
+                    {/* Recent Transactions */}
+                    {walletData.recentTransactions.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-3">Recent Transactions</h4>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Date</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {walletData.recentTransactions.slice(0, 10).map((tx) => (
+                                <TableRow key={tx.id}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="text-sm font-medium">{tx.user?.name || 'Unknown'}</div>
+                                      <div className="text-xs text-muted-foreground">{tx.user?.email}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={tx.type === 'DEPOSIT' ? 'default' : 'secondary'}>
+                                      {tx.type}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-right font-medium ${tx.type === 'DEPOSIT' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount, walletData.overview.currency)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={tx.status === 'COMPLETED' ? 'default' : tx.status === 'PENDING' ? 'secondary' : 'destructive'}>
+                                      {tx.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {format(new Date(tx.createdAt), 'MMM d, h:mm a')}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-center py-8 text-muted-foreground">No wallet data available</p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Admin Notice */}
             <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
               <CardContent className="py-4">
@@ -815,6 +1217,112 @@ export default function AdminFinancialsPage() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* SECTION 6 — PATIENT WALLETS (Custodial Money, Not Revenue) */}
+            <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Patient Wallets
+                </CardTitle>
+                <CardDescription>
+                  Custodial money — not revenue. Pre-loaded funds held in patient accounts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {walletLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : walletData ? (
+                  <div className="space-y-6">
+                    {/* Wallet Stats */}
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-emerald-600">
+                          {formatCurrency(walletData.overview.totalBalance, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Total Balance</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Across {walletData.overview.walletCount} wallets
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(walletData.thisWeek.deposits.amount, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Deposits This Week</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {walletData.thisWeek.deposits.count} transactions
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold">
+                          {walletData.thisWeek.transactions}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Transactions This Week</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold">
+                          {formatCurrency(walletData.overview.averageBalance, walletData.overview.currency)}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Average Balance</p>
+                      </div>
+                    </div>
+
+                    {/* Recent Transactions */}
+                    {walletData.recentTransactions.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-3">Recent Transactions</h4>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>User</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Date</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {walletData.recentTransactions.slice(0, 10).map((tx) => (
+                                <TableRow key={tx.id}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="text-sm font-medium">{tx.user?.name || 'Unknown'}</div>
+                                      <div className="text-xs text-muted-foreground">{tx.user?.email}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={tx.type === 'DEPOSIT' ? 'default' : 'secondary'}>
+                                      {tx.type}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-right font-medium ${tx.type === 'DEPOSIT' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount, walletData.overview.currency)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={tx.status === 'COMPLETED' ? 'default' : tx.status === 'PENDING' ? 'secondary' : 'destructive'}>
+                                      {tx.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {format(new Date(tx.createdAt), 'MMM d, h:mm a')}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-center py-8 text-muted-foreground">No wallet data available</p>
+                )}
               </CardContent>
             </Card>
           </>

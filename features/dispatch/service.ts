@@ -140,6 +140,10 @@ export const dispatchService = {
     page?: number;
     limit?: number;
   } = {}): Promise<any> {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/service.ts:getDeliveryHistory:ENTRY',message:'History query called',data:{filters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     const params = new URLSearchParams();
     
     Object.entries(filters).forEach(([key, value]) => {
@@ -149,6 +153,16 @@ export const dispatchService = {
     });
 
     const response = await api.get(`/dispatch/history?${params}`);
+    
+    // #region agent log
+    try {
+      const rawResponse = response.data ? JSON.stringify(response.data).substring(0,500) : 'null';
+      fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/service.ts:getDeliveryHistory:RESPONSE',message:'API response received',data:{responseDataType:typeof response.data,isArray:Array.isArray(response.data),hasData:!!response.data?.data,dataLength:Array.isArray(response.data?.data)?response.data.data.length:response.data?.data?.length||0,responseKeys:Object.keys(response.data||{}),rawResponse},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,D'})}).catch(()=>{});
+    } catch(e) {
+      fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dispatch/service.ts:getDeliveryHistory:RESPONSE:ERROR',message:'Error logging response',data:{error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,D'})}).catch(()=>{});
+    }
+    // #endregion
+    
     return response.data;
   },
 

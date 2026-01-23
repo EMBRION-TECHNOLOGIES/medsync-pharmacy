@@ -25,24 +25,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"]
   },
-  // Turbopack configuration (Next.js 16 default)
-  turbopack: {
-    resolveAlias: {
-      // Fix for react-web-gifted-chat: alias react-native to react-native-web
-      'react-native': 'react-native-web',
-    },
-  },
-  // Webpack configuration (fallback for --webpack flag)
-  webpack: (config, { isServer }) => {
-    // Fix for react-web-gifted-chat: alias react-native to react-native-web
-    if (!isServer) {
-      config.resolve.alias = {
-        ...(config.resolve.alias || {}),
-        'react-native': 'react-native-web',
-      };
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
