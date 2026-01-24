@@ -175,22 +175,25 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
           setValue('longitude', longitude);
 
           try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=16`
+            const res = await fetch(
+              `/api/geocode/reverse?lat=${latitude}&lon=${longitude}`
             );
-            const data = await response.json();
+            const json = await res.json();
+            const data = json.success ? json.data : null;
 
-            if (data && data.display_name) {
+            if (data?.display_name) {
               const addressParts = data.display_name.split(',');
               const shortAddress = addressParts.slice(0, 3).join(', ').trim();
               setValue('address', shortAddress);
-              
+
               if (data.address) {
                 const city = data.address.city || data.address.town || data.address.village || data.address.state;
                 if (city) {
                   setValue('city', city);
                 }
               }
+            } else {
+              setValue('address', `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
             }
           } catch (reverseGeoError) {
             console.error('Reverse geocoding error:', reverseGeoError);

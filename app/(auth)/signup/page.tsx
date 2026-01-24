@@ -19,6 +19,13 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
 import { PasswordStrength, isPasswordValid } from '@/components/ui/password-strength';
+import {
+  isLicenseFormatValid,
+  getLicenseJurisdictionHint,
+  normalizeLicense,
+  LICENSE_FORMAT_ERROR,
+  LICENSE_SOFT_WARNING,
+} from '@/lib/license-validation';
 
 type PharmacyRegistrationForm = PharmacyRegistrationInput;
 
@@ -95,17 +102,20 @@ export default function SignupPage() {
           setValue('latitude', latitude);
           setValue('longitude', longitude);
 
-          // Reverse geocode to get address
+          // Reverse geocode via our proxy (avoids CORS, User-Agent, and "Failed to fetch")
           try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=16`
+            const res = await fetch(
+              `/api/geocode/reverse?lat=${latitude}&lon=${longitude}`
             );
-            const data = await response.json();
+            const json = await res.json();
+            const data = json.success ? json.data : null;
 
-            if (data && data.display_name) {
+            if (data?.display_name) {
               const addressParts = data.display_name.split(',');
               const shortAddress = addressParts.slice(0, 3).join(', ').trim();
               setValue('address', shortAddress);
+            } else {
+              setValue('address', `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
             }
           } catch (reverseGeoError) {
             console.error('Reverse geocoding error:', reverseGeoError);
@@ -150,33 +160,28 @@ export default function SignupPage() {
   };
 
 
-  // License validation function
-  const validateLicenseNumber = (licenseNumber: string): boolean => {
-    // Nigerian pharmacy license format validation
-    // Format: Usually starts with PH, followed by numbers/letters
-    const licensePattern = /^PH[A-Z0-9]{6,12}$/i;
-    return licensePattern.test(licenseNumber.trim());
-  };
-
-  // License verification function (placeholder for future API integration)
+  // License verification (placeholder for future PCN API). Layer 1 = format check; Layer 2 = soft hint only.
   const verifyLicenseWithAPI = async (licenseNumber: string) => {
     setIsValidatingLicense(true);
     setLicenseValidationStatus('validating');
-    
+
     try {
-      // TODO: Replace with actual Nigerian Pharmacy Council API
-      // For now, simulate API call with format validation
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
-      
-      const isValidFormat = validateLicenseNumber(licenseNumber);
-      
-      if (isValidFormat) {
-        // In production, this would call the actual verification API
-        setLicenseValidationStatus('pending');
-        toast.success('License format valid. Awaiting verification...');
-      } else {
+      await new Promise((r) => setTimeout(r, 1500));
+
+      const formatValid = isLicenseFormatValid(licenseNumber);
+      const jurisdiction = getLicenseJurisdictionHint(licenseNumber);
+
+      if (!formatValid) {
         setLicenseValidationStatus('invalid');
-        toast.error('Invalid license number format');
+        toast.error(LICENSE_FORMAT_ERROR);
+        return;
+      }
+
+      setLicenseValidationStatus('pending');
+      if (jurisdiction === 'known') {
+        toast.success('License format valid. Awaiting verification…');
+      } else {
+        toast.info(LICENSE_SOFT_WARNING);
       }
     } catch {
       setLicenseValidationStatus('invalid');
@@ -216,34 +221,35 @@ export default function SignupPage() {
   };
 
   const onSubmitStep2 = async () => {
-    // Validate required fields for step 2
     const pharmacyName = watch('pharmacyName');
     const address = watch('address');
     const pharmacyEmail = watch('pharmacyEmail');
     const licenseNumber = watch('licenseNumber');
     const latitude = watch('latitude');
     const longitude = watch('longitude');
-    
-    // Check if we have coordinates
-    const hasCoordinates = latitude && longitude;
-    
+
+    const hasCoordinates = !!latitude && !!longitude;
+
     if (!pharmacyName || !pharmacyEmail || !licenseNumber) {
       toast.error('Please fill in all required pharmacy information');
       return;
     }
-    
-    // Only require address if we don't have coordinates
+
+    if (!isLicenseFormatValid(licenseNumber)) {
+      toast.error(LICENSE_FORMAT_ERROR);
+      return;
+    }
+
     if (!hasCoordinates && !address) {
       toast.error('Please enter a pharmacy address or use GPS location');
       return;
     }
-    
-    // Validate that we have coordinates (either from address or GPS)
+
     if (!hasCoordinates) {
       toast.error('Please enter a valid address to get location coordinates');
       return;
     }
-    
+
     setCurrentStep(3);
   };
 
@@ -266,7 +272,7 @@ export default function SignupPage() {
         address: data.address || 'Current Location',
         phone: data.phone || '',
         email: data.pharmacyEmail,
-        pcnRegistrationNumber: data.licenseNumber,
+        pcnRegistrationNumber: normalizeLicense(data.licenseNumber),
         initiatorRole: 'PHARMACY_OWNER' as const,
       };
       
@@ -620,41 +626,45 @@ export default function SignupPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="licenseNumber">License Number</Label>
+                    <Label htmlFor="licenseNumber">Pharmacy Licence Number (PCN)</Label>
                     <div className="flex gap-2">
                       <Input
                         id="licenseNumber"
-                        placeholder="PH123456789"
+                        placeholder="FCT2025CD16C"
                         {...registerField('licenseNumber')}
                         disabled={isLoading}
                         className="flex-1"
                         onBlur={(e) => {
-                          const licenseNumber = e.target.value;
-                          if (licenseNumber && licenseNumber.trim()) {
-                            const isValid = validateLicenseNumber(licenseNumber);
-                            if (isValid) {
-                              setLicenseValidationStatus('valid');
-                            } else {
-                              setLicenseValidationStatus('invalid');
-                            }
-                          } else {
+                          const raw = e.target.value;
+                          if (!raw?.trim()) {
                             setLicenseValidationStatus('idle');
+                            return;
                           }
+                          setLicenseValidationStatus(
+                            isLicenseFormatValid(raw) ? 'valid' : 'invalid'
+                          );
                         }}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => verifyLicenseWithAPI(watch('licenseNumber'))}
-                        disabled={isLoading || isValidatingLicense || !watch('licenseNumber')}
+                        onClick={() => verifyLicenseWithAPI(watch('licenseNumber') ?? '')}
+                        disabled={
+                          isLoading ||
+                          isValidatingLicense ||
+                          !watch('licenseNumber') ||
+                          !isLicenseFormatValid(watch('licenseNumber') ?? '')
+                        }
                         className="shrink-0"
                       >
                         <Shield className="h-4 w-4" />
                       </Button>
                     </div>
                     {errors.licenseNumber && (
-                      <p className="text-sm text-destructive">{errors.licenseNumber.message}</p>
+                      <p className="text-sm text-destructive">
+                        {errors.licenseNumber.message}
+                      </p>
                     )}
                     {licenseValidationStatus === 'valid' && (
                       <p className="text-sm text-green-600 flex items-center gap-1">
@@ -671,11 +681,19 @@ export default function SignupPage() {
                     {licenseValidationStatus === 'invalid' && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
-                        Invalid license format
+                        {LICENSE_FORMAT_ERROR}
                       </p>
                     )}
+                    {licenseValidationStatus === 'valid' &&
+                      getLicenseJurisdictionHint(watch('licenseNumber') ?? '') === 'unknown' && (
+                        <p className="text-sm text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {LICENSE_SOFT_WARNING}
+                        </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
-                      Enter your Nigerian Pharmacy Council license number.
+                      Enter the licence number issued by the Pharmacists Council of Nigeria.
+
                     </p>
                   </div>
 

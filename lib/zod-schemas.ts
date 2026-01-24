@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isLicenseFormatValid, LICENSE_FORMAT_ERROR } from './license-validation';
 
 // API Response wrapper schema
 export const apiResponseSchema = z.object({
@@ -52,7 +53,10 @@ export const pharmacyRegistrationSchema = z.object({
   address: z.string().min(1, 'Address is required'),
   phone: z.string().min(1, 'Phone number is required'),
   pharmacyEmail: z.string().email('Invalid pharmacy email'),
-  licenseNumber: z.string().min(1, 'License number is required'),
+  licenseNumber: z
+    .string()
+    .min(1, 'License number is required')
+    .refine(isLicenseFormatValid, { message: LICENSE_FORMAT_ERROR }),
   latitude: z.number().min(-90).max(90, 'Invalid latitude').optional(),
   longitude: z.number().min(-180).max(180, 'Invalid longitude').optional(),
   description: z.string().optional(),
