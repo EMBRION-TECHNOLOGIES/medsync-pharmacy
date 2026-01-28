@@ -270,7 +270,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
             </CardContent>
           </Card>
 
-          {/* Patient/Recipient Information - ANONYMOUS: Only show TeraSync ID, no names */}
+          {/* Patient/Recipient Information - ANONYMOUS: Only show TeraSync ID, no names, NO address */}
           <Card>
             <CardHeader>
               <CardTitle>Recipient Information</CardTitle>
@@ -287,12 +287,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                   <span className="font-medium font-mono">{maskPhone(order.receiverPhone)}</span>
                 </div>
               )}
-              {order.deliveryAddress && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Delivery Address</span>
-                  <span className="font-medium text-right">{order.deliveryAddress}</span>
-                </div>
-              )}
+              {/* REMOVED: deliveryAddress - Patient address must NOT be visible to pharmacy (privacy) */}
             </CardContent>
           </Card>
 

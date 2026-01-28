@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const NAMESPACE = process.env.NEXT_PUBLIC_SOCKET_NAMESPACE || '/';
+const NAMESPACE = process.env.NEXT_PUBLIC_SOCKET_NAMESPACE || '/patient-pharmacy';
 
 type Handlers = {
   onConnect?: () => void;
