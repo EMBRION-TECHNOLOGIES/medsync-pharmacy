@@ -45,30 +45,32 @@ function formatDate(date: string | Date | number | null | undefined): string {
 export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
   const dispense = useDispenseOrder();
   const router = useRouter();
-  
+  const orderId = (order as any)?.id ?? (order as any)?.orderId;
+
   // Join consolidated order room for live updates
-  if (order?.id) {
+  if (orderId) {
     try {
-      socketService.joinOrder(order.id);
+      socketService.joinOrder(orderId);
     } catch {}
   }
 
   if (!order) return null;
 
-  const orderStatus = (order.status || '').toUpperCase();
+  const orderStatus = ((order as any).status ?? (order as any).orderStatus ?? '').toString().toUpperCase();
   const canDispense = orderStatus === 'CONFIRMED' && orderStatus !== 'PREPARED' && orderStatus !== 'DISPENSED' && orderStatus !== 'DELIVERED';
+  const displayDate = (order as any).createdAt ?? (order as any).updatedAt;
 
   const handleDispense = () => {
-    const items = order.items.map((item) => ({
+    const items = ((order as any).items ?? []).map((item: any) => ({
       drugId: item.drugId,
       qty: item.quantity,
     }));
-    dispense.mutate({ id: order.id, items });
+    dispense.mutate({ id: orderId, items });
   };
 
   const handleViewFullDetails = () => {
-    onOpenChange(false); // Close modal first
-    router.push(`/orders/${order.id}`);
+    onOpenChange(false);
+    router.push(`/orders/${orderId}`);
   };
 
   return (
@@ -93,7 +95,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              {formatDate(order.createdAt)}
+              {formatDate((order as any).createdAt ?? (order as any).updatedAt)}
             </div>
           </div>
 
@@ -108,7 +110,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             <div className="pl-6 space-y-1">
               <p className="text-sm">
                 <span className="text-muted-foreground">MedSync ID:</span>{' '}
-                {(order as any).patient?.medSyncId || order.patientAlias || '—'}
+                {(order as any).patient?.medSyncId ?? (order as any).patientMsid ?? (order as any).patientAlias ?? '—'}
               </p>
             </div>
           </div>
@@ -122,7 +124,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
               Order Items
             </div>
             <div className="space-y-2">
-              {order.items.map((item, index) => (
+              {((order as any).items ?? []).map((item: any, index: number) => (
                 <div
                   key={item.id || index}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
@@ -135,7 +137,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
                   </div>
                   <div className="text-right">
                     <p className="font-medium">
-                      Qty: {item.quantity} {item.unit || 'tablets'}
+                      Qty: {item.quantity} {item.unit || 'units'}
                     </p>
                     {item.priceNgn && (
                       <p className="text-sm text-muted-foreground">

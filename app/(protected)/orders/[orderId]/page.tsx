@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use, useCallback } from 'react';
+import { useEffect, useState, use, useCallback, useMemo } from 'react';
 import { ordersService, type OrderDTO, type OrderDispatch, type OrderItem } from '@/features/orders/service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
   const dispatchId = order?.dispatch?.id;
   const isActiveDelivery = (orderStatus === 'OUT_FOR_DELIVERY' || orderStatus === 'DISPENSED') && dispatchId;
   const { data: deliveryData } = useTrackDelivery(isActiveDelivery ? dispatchId : undefined);
+
+  const track = useMemo(() => {
+    if (!deliveryData || !isActiveDelivery) return null;
+    const d = (deliveryData as { data?: { dispatch?: { status?: string }; providerStatus?: { status?: string; driver?: { name?: string; phone?: string; vehicleType?: string; vehicleNumber?: string } }; trackingUrl?: string; estimatedArrival?: string } })?.data;
+    if (!d) return null;
+    return {
+      status: d.dispatch?.status ?? d.providerStatus?.status,
+      driver: d.providerStatus?.driver,
+      trackingUrl: d.trackingUrl,
+      estimatedArrival: d.estimatedArrival,
+    };
+  }, [deliveryData, isActiveDelivery]);
 
   const load = useCallback(async () => {
     try {
@@ -100,27 +112,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
     try {
       setIsReadyPending(true);
       
-      // Get delivery address coordinates from order or use defaults
       interface OrderWithDelivery extends OrderDTO {
         deliveryLat?: number;
         deliveryLng?: number;
       }
       const orderWithDelivery = order as OrderWithDelivery;
+      const lat = orderWithDelivery.deliveryLat;
+      const lng = orderWithDelivery.deliveryLng;
+      if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+        toast.error('Delivery coordinates are required. Add a delivery address with location before booking.');
+        return;
+      }
       const deliveryAddress = {
-        latitude: orderWithDelivery.deliveryLat || 6.5244, // Use order's deliveryLat or default Lagos coordinates
-        longitude: orderWithDelivery.deliveryLng || 3.3792, // Use order's deliveryLng or default Lagos coordinates
+        latitude: Number(lat),
+        longitude: Number(lng),
         address: order.deliveryAddress || 'Delivery address not specified',
       };
-      
-      console.log('🚚 Booking dispatch with address:', deliveryAddress);
-      
+
       const updated = await ordersService.bookDispatch(order.orderId, deliveryAddress);
       setOrder(updated);
       toast.success('Dispatch booked successfully!');
     } catch (error: unknown) {
-      const apiError = error as { message?: string };
-      console.error('Failed to book dispatch:', error);
-      toast.error(apiError?.message || 'Failed to book dispatch');
+      const apiError = error as { message?: string; response?: { data?: { error?: { message?: string } }; status?: number } };
+      const msg = apiError?.response?.data?.error?.message ?? apiError?.message ?? 'Failed to book dispatch';
+      if (apiError?.response?.status === 400 && /coordinates?|latitude|longitude/i.test(String(msg))) {
+        toast.error('Delivery coordinates are required. Add a delivery address with location before booking.');
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsReadyPending(false);
     }
@@ -399,7 +418,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
           )}
 
           {/* Delivery Tracking - For active deliveries */}
-          {isActiveDelivery && deliveryData && (
+          {isActiveDelivery && track && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -408,22 +427,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Status Badge */}
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Status:</span>
                   <Badge className={
-                    deliveryData.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
-                    deliveryData.status === 'IN_TRANSIT' ? 'bg-purple-100 text-purple-800' :
-                    deliveryData.status === 'PICKED_UP' ? 'bg-indigo-100 text-indigo-800' :
-                    deliveryData.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
+                    track.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                    track.status === 'IN_TRANSIT' ? 'bg-purple-100 text-purple-800' :
+                    track.status === 'PICKED_UP' ? 'bg-indigo-100 text-indigo-800' :
+                    track.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
                     'bg-gray-100 text-gray-800'
                   }>
-                    {deliveryData.status?.replace('_', ' ') || 'Pending'}
+                    {track.status?.replace('_', ' ') || 'Pending'}
                   </Badge>
                 </div>
 
-                {/* Driver Information */}
-                {deliveryData.driver && (
+                {track.driver && (
                   <div className="space-y-2 border-t pt-4">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <User className="h-4 w-4" />
@@ -432,46 +449,46 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                     <div className="pl-6 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Name:</span>
-                        <span className="text-sm font-medium">{deliveryData.driver.name}</span>
+                        <span className="text-sm font-medium">{track.driver.name}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Phone:</span>
-                        <a href={`tel:${deliveryData.driver.phone}`} className="text-sm text-primary hover:underline">
-                          {deliveryData.driver.phone}
-                        </a>
-                      </div>
-                      {deliveryData.driver.vehicleType && (
+                      {track.driver.phone && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Vehicle:</span>
-                          <span className="text-sm">{deliveryData.driver.vehicleType}</span>
+                          <span className="text-sm text-muted-foreground">Phone:</span>
+                          <a href={`tel:${track.driver.phone}`} className="text-sm text-primary hover:underline">
+                            {track.driver.phone}
+                          </a>
                         </div>
                       )}
-                      {deliveryData.driver.vehicleNumber && (
+                      {track.driver.vehicleType && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Vehicle:</span>
+                          <span className="text-sm">{track.driver.vehicleType}</span>
+                        </div>
+                      )}
+                      {track.driver.vehicleNumber && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Plate:</span>
-                          <span className="text-sm font-mono">{deliveryData.driver.vehicleNumber}</span>
+                          <span className="text-sm font-mono">{track.driver.vehicleNumber}</span>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* ETA */}
-                {deliveryData.estimatedArrival && (
+                {track.estimatedArrival && (
                   <div className="flex items-center justify-between border-t pt-4">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Estimated Arrival:</span>
                     </div>
-                    <span className="text-sm">{new Date(deliveryData.estimatedArrival).toLocaleString()}</span>
+                    <span className="text-sm">{new Date(track.estimatedArrival).toLocaleString()}</span>
                   </div>
                 )}
 
-                {/* Tracking URL */}
-                {deliveryData.trackingUrl && (
+                {track.trackingUrl && (
                   <div className="border-t pt-4">
                     <a 
-                      href={deliveryData.trackingUrl} 
+                      href={track.trackingUrl} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="inline-flex items-center gap-2 text-sm text-primary hover:underline"

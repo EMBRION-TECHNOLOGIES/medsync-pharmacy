@@ -247,6 +247,9 @@ export function useChatOrdersSocket() {
   return socket;
 }
 
+const CHAT_ROOM_JOIN_RETRY_MS = 500;
+const CHAT_ROOM_JOIN_MAX_ATTEMPTS = 24; // 12 seconds total
+
 // Hook for individual chat room subscriptions
 export function useChatRoomSocket(roomId?: string) {
   const socket = useChatOrdersSocket();
@@ -256,28 +259,57 @@ export function useChatRoomSocket(roomId?: string) {
       return;
     }
 
-    let retryTimer: NodeJS.Timeout | null = null;
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
+    let attempts = 0;
+    let connectUnsubscribe: (() => void) | null = null;
 
-    // Wait for socket to be connected before joining
-    if (socket.isConnected()) {
-      console.log('🔵 Joining chat room:', roomId);
-      socket.joinChat(roomId);
+    const clearRetry = () => {
+      if (retryInterval) {
+        clearInterval(retryInterval);
+        retryInterval = null;
+      }
+    };
+
+    const tryJoin = () => {
+      if (socket.isConnected()) {
+        console.log('🔵 Joining chat room:', roomId);
+        socket.joinChat(roomId);
+        clearRetry();
+        connectUnsubscribe?.();
+        connectUnsubscribe = null;
+        return true;
+      }
+      return false;
+    };
+
+    if (tryJoin()) {
+      // Already connected
     } else {
-      console.log('⏳ Socket not connected yet, waiting...');
-      // Retry after a short delay
-      retryTimer = setTimeout(() => {
-        if (socket.isConnected()) {
-          console.log('🔵 Joining chat room (retry):', roomId);
-          socket.joinChat(roomId);
-        } else {
-          console.error('❌ Socket still not connected after retry');
+      // Subscribe to connect so we join as soon as socket connects
+      const rawSocket = socket.getSocket();
+      if (rawSocket) {
+        const onConnect = () => tryJoin();
+        rawSocket.once('connect', onConnect);
+        connectUnsubscribe = () => rawSocket.off('connect', onConnect);
+      }
+
+      // Fallback: poll in case connect event order or timing is off
+      console.log('⏳ Socket not connected yet, will retry until connected…');
+      retryInterval = setInterval(() => {
+        attempts += 1;
+        if (tryJoin()) return;
+        if (attempts >= CHAT_ROOM_JOIN_MAX_ATTEMPTS) {
+          console.warn('⚠️ Socket did not connect in time; chat room join skipped for', roomId);
+          clearRetry();
+          connectUnsubscribe?.();
+          connectUnsubscribe = null;
         }
-      }, 1000);
+      }, CHAT_ROOM_JOIN_RETRY_MS);
     }
-    
-    // Leave room on cleanup
+
     return () => {
-      if (retryTimer) clearTimeout(retryTimer);
+      clearRetry();
+      connectUnsubscribe?.();
       console.log('🔴 Leaving chat room:', roomId);
       socket.leaveChat(roomId);
     };

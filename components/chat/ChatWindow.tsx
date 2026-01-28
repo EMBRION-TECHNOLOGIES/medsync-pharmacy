@@ -6,7 +6,6 @@ import { MessageSquare, Send } from 'lucide-react';
 import { useAuth } from '@/features/auth/hooks';
 import { OrderForm } from './OrderForm';
 import { Button } from '@/components/ui/button';
-import { FileText, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OrderDetail } from '@/components/orders/OrderDetail';
 import { useOrder } from '@/features/chat-orders/hooks';
@@ -314,26 +313,7 @@ export function ChatWindow({
                 onOrderCreated={onOrderCreated}
               />
 
-              {/* Other Quick Actions */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onQuickAction?.('note')}
-                className="flex items-center gap-1 sm:gap-2 text-ms-blue hover:text-ms-blue/80 touch-manipulation min-h-[36px]"
-              >
-                <FileText className="h-4 w-4" />
-                <span className="text-xs hidden sm:inline">Add Note</span>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onQuickAction?.('escalate')}
-                className="flex items-center gap-1 sm:gap-2 text-red-500 hover:text-red-600 touch-manipulation min-h-[36px]"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-xs hidden sm:inline">Escalate</span>
-              </Button>
+              {/* Other Quick Actions - Add Note / Escalate hidden (were for testing) */}
             </div>
           </div>
         )}

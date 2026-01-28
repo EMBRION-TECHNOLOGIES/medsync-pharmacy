@@ -184,7 +184,7 @@ export function OrdersTable({ orders, onViewOrder }: OrdersTableProps) {
                         )}
                         <div className="flex gap-4 mt-2 text-sm">
                           <span className="text-muted-foreground">
-                            Quantity: <span className="font-medium">{item.quantity}</span>
+                            Quantity: <span className="font-medium">{item.quantity} {item.unit || 'units'}</span>
                           </span>
                           {item.drugId && (
                             <span className="text-muted-foreground">

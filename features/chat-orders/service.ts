@@ -63,8 +63,15 @@ export const chatOrdersService = {
 
   async getOrder(id: string): Promise<Order> {
     const response = await api.get(`/chat-orders/${id}`);
-    // API interceptor unwraps { success: true, data: order } to just the order object
-    return response.data;
+    // API interceptor may unwrap { success: true, data: order } to order, or leave data as { order }
+    const raw = response.data?.order ?? response.data?.data ?? response.data;
+    if (!raw || typeof raw !== 'object') return response.data as Order;
+    // Ensure date and status exist for Order Details modal (backend Prisma has createdAt/updatedAt/status)
+    const order = { ...raw } as Order;
+    if (!order.createdAt && (raw as any).updatedAt) order.createdAt = (raw as any).updatedAt;
+    if (!order.createdAt) order.createdAt = new Date().toISOString();
+    if (!order.status && (raw as any).orderStatus) order.status = (raw as any).orderStatus as OrderStatus;
+    return order;
   },
 
   async updateOrderStatus(id: string, status: OrderStatus, notes?: string): Promise<Order> {

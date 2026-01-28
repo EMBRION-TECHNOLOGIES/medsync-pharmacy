@@ -37,6 +37,7 @@ export interface OrderItem {
   drugName: string;
   dosageSig?: string;
   quantity: number;
+  unit?: string; // e.g. "packs", "tablets", "cards", "bottles"
   priceNgn: number;
   drugId?: string;
 }
@@ -211,6 +212,7 @@ export const ordersService = {
           paymentStatus: order.paymentStatus || 'Pending',
           dispatchStatus: order.dispatch?.status,
           isReadyForDispatch: order.isReadyForDispatch || false,
+          createdAt: order.createdAt ?? order.updatedAt,
           updatedAt: order.updatedAt,
           events: order.events || [],
           items: order.items, // ✅ Map items array
@@ -320,23 +322,26 @@ export const ordersService = {
       if (apiError.response?.status === 404) {
         // Fallback to chat-orders
         const response = await api.get(`/chat-orders/${id}`);
-        const order = (response.data.order || response.data.data?.order || response.data.data) as BackendOrderResponse;
+        const order = (response.data?.order || response.data?.data?.order || response.data) as BackendOrderResponse;
+        const rawOrder = order && typeof order === 'object' ? order : (response.data as any);
         return {
-          orderId: order.id,
-          orderCode: order.orderCode,
-          orderStatus: (order.orderStatus || (order as BackendOrderResponse & { status?: string }).status || 'PENDING') as string, // Backend might return either field
-          paymentStatus: order.paymentStatus || 'Pending',
-          dispatchStatus: order.dispatch?.status,
-          isReadyForDispatch: order.isReadyForDispatch || false,
-          updatedAt: order.updatedAt || new Date().toISOString(),
-          events: order.events || [],
-          patientMsid: order.patientMsid || order.patient?.medSyncId || undefined,
-          dispatch: order.dispatch ? {
-            id: order.dispatch.id,
-            provider: order.dispatch.provider,
-            trackingNumber: order.dispatch.trackingNumber,
-            trackingUrl: order.dispatch.trackingUrl,
-            eta: order.dispatch.eta || order.dispatch.estimatedArrival,
+          orderId: rawOrder?.id || order?.id,
+          orderCode: rawOrder?.orderCode ?? order?.orderCode,
+          orderStatus: (rawOrder?.orderStatus ?? rawOrder?.status ?? order?.orderStatus ?? order?.status ?? 'PENDING') as string,
+          paymentStatus: rawOrder?.paymentStatus ?? order?.paymentStatus ?? 'Pending',
+          dispatchStatus: rawOrder?.dispatch?.status ?? order?.dispatch?.status,
+          isReadyForDispatch: rawOrder?.isReadyForDispatch ?? order?.isReadyForDispatch ?? false,
+          createdAt: rawOrder?.createdAt ?? order?.createdAt ?? rawOrder?.updatedAt ?? order?.updatedAt,
+          updatedAt: rawOrder?.updatedAt ?? order?.updatedAt ?? new Date().toISOString(),
+          events: rawOrder?.events ?? order?.events ?? [],
+          items: rawOrder?.items ?? order?.items,
+          patientMsid: rawOrder?.patientMsid ?? rawOrder?.patient?.medSyncId ?? order?.patientMsid ?? order?.patient?.medSyncId ?? undefined,
+          dispatch: (rawOrder?.dispatch || order?.dispatch) ? {
+            id: (rawOrder?.dispatch || order?.dispatch).id,
+            provider: (rawOrder?.dispatch || order?.dispatch).provider,
+            trackingNumber: (rawOrder?.dispatch || order?.dispatch).trackingNumber,
+            trackingUrl: (rawOrder?.dispatch || order?.dispatch).trackingUrl,
+            eta: (rawOrder?.dispatch || order?.dispatch).eta ?? (rawOrder?.dispatch || order?.dispatch).estimatedArrival,
           } : undefined,
         } as OrderDTO;
       }
