@@ -27,14 +27,14 @@ const locationSchema = z.object({
   name: z.string().min(1, 'Location name is required'),
   address: z.string().min(1, 'Address is required'),
   city: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone number is required'),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   // Supervisor fields (required for new locations)
   supervisorFirstName: z.string().min(1, 'First name is required'),
   supervisorLastName: z.string().min(1, 'Last name is required'),
   supervisorEmail: z.string().email('Valid email is required'),
-  supervisorPhone: z.string().optional(),
+  supervisorPhone: z.string().min(1, 'Supervisor phone number is required'),
   supervisorPassword: z.string().min(8, 'Password must be at least 8 characters'),
   supervisorLicenseNumber: z.string().min(1, 'PCN License number is required'),
 });
@@ -44,7 +44,7 @@ const editLocationSchema = z.object({
   name: z.string().min(1, 'Location name is required'),
   address: z.string().min(1, 'Address is required'),
   city: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone number is required'),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
 });
@@ -495,7 +495,7 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Phone Number *</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -503,6 +503,9 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
                   {...register('phone')}
                   disabled={isSubmitting}
                 />
+                {errors.phone && (
+                  <p className="text-sm text-destructive">{errors.phone.message}</p>
+                )}
               </div>
             </div>
 
@@ -569,7 +572,7 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="supervisorPhone">Phone Number</Label>
+                  <Label htmlFor="supervisorPhone">Phone Number *</Label>
                   <Input
                     id="supervisorPhone"
                     type="tel"
@@ -577,6 +580,9 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
                     {...register('supervisorPhone')}
                     disabled={isSubmitting}
                   />
+                  {errors.supervisorPhone && (
+                    <p className="text-sm text-destructive">{errors.supervisorPhone.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

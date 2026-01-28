@@ -78,7 +78,7 @@ export function EditPersonModal({ open, onOpenChange, member }: EditPersonModalP
     isPharmacistRole && member?.roleType !== formData.roleType;
 
   const isFormValid = () => {
-    if (!formData.name) {
+    if (!formData.name || !formData.phone?.trim()) {
       return false;
     }
     // PCN required when changing to pharmacist role
@@ -104,7 +104,7 @@ export function EditPersonModal({ open, onOpenChange, member }: EditPersonModalP
         personId: member.id,
         data: {
           name: formData.name !== member.name ? formData.name : undefined,
-          phone: formData.phone !== (member.phone || '') ? formData.phone || undefined : undefined,
+          phone: formData.phone.trim(),
           roleType: formData.roleType !== member.roleType ? (formData.roleType as PharmacyRoleType) : undefined,
           locationId: formData.locationId !== (member.locationId || '') ? (formData.locationId || null) : undefined,
           pcnNumber: isChangingToPharmacistRole ? formData.pcnNumber : undefined,
@@ -159,13 +159,14 @@ export function EditPersonModal({ open, onOpenChange, member }: EditPersonModalP
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Phone Number *</Label>
               <Input
                 id="phone"
                 type="tel"
-                placeholder="Enter phone number (optional)"
+                placeholder="Enter phone number"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                required
               />
             </div>
 

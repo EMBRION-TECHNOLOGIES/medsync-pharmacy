@@ -63,7 +63,7 @@ export function AddPersonModal({ open, onOpenChange }: AddPersonModalProps) {
   const isLocationScoped = formData.roleType === 'SUPERVISING_PHARMACIST' || formData.roleType === 'STAFF';
 
   const isFormValid = () => {
-    if (!formData.name || !formData.email || !formData.roleType || !formData.password || !formData.confirmPassword) {
+    if (!formData.name || !formData.email || !formData.phone?.trim() || !formData.roleType || !formData.password || !formData.confirmPassword) {
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -123,7 +123,7 @@ export function AddPersonModal({ open, onOpenChange }: AddPersonModalProps) {
       await addPersonMutation.mutateAsync({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone || undefined,
+        phone: formData.phone.trim(),
         roleType: formData.roleType as PharmacyRoleType,
         password: formData.password,
         forcePasswordReset: formData.forcePasswordReset,
@@ -190,13 +190,14 @@ export function AddPersonModal({ open, onOpenChange }: AddPersonModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
+            <Label htmlFor="phone">Phone Number *</Label>
             <Input
               id="phone"
               type="tel"
-              placeholder="Enter phone number (optional)"
+              placeholder="Enter phone number"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              required
             />
           </div>
 
