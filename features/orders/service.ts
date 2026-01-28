@@ -75,6 +75,8 @@ export interface OrderDTO {
   receiverName?: string;
   receiverPhone?: string;
   deliveryAddress?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
   // Dispatch
   dispatch?: OrderDispatch;
   events?: OrderEventDTO[];
@@ -255,6 +257,8 @@ export const ordersService = {
       receiverName?: string;
       receiverPhone?: string;
       deliveryAddress?: string | { address?: string; contactName?: string; contactPhone?: string };
+      deliveryLat?: number;
+      deliveryLng?: number;
       timeline?: OrderEventDTO[];
       events?: OrderEventDTO[];
     }
@@ -299,6 +303,8 @@ export const ordersService = {
         receiverName: order.receiverName || (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.contactName : undefined), // NOTE: Should NOT be displayed to pharmacy
         receiverPhone: order.receiverPhone || (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.contactPhone : undefined), // Backend returns receiverPhone directly
         deliveryAddress: typeof order.deliveryAddress === 'string' ? order.deliveryAddress : (typeof order.deliveryAddress === 'object' && order.deliveryAddress !== null ? order.deliveryAddress.address : undefined),
+        deliveryLat: order.deliveryLat,
+        deliveryLng: order.deliveryLng,
         dispatch: order.dispatch ? {
           id: order.dispatch.id,
           provider: order.dispatch.provider,
@@ -343,6 +349,9 @@ export const ordersService = {
             trackingUrl: (rawOrder?.dispatch || order?.dispatch).trackingUrl,
             eta: (rawOrder?.dispatch || order?.dispatch).eta ?? (rawOrder?.dispatch || order?.dispatch).estimatedArrival,
           } : undefined,
+          deliveryAddress: rawOrder?.deliveryAddress ?? order?.deliveryAddress,
+          deliveryLat: rawOrder?.deliveryLat ?? order?.deliveryLat,
+          deliveryLng: rawOrder?.deliveryLng ?? order?.deliveryLng,
         } as OrderDTO;
       }
       throw error;

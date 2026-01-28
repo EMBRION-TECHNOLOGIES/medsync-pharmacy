@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use, useCallback, useMemo } from 'react';
 import { ordersService, type OrderDTO, type OrderDispatch, type OrderItem } from '@/features/orders/service';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,27 +109,49 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
 
   const bookDispatch = async () => {
     if (!order || isReadyPending) return;
-    
-    try {
-      setIsReadyPending(true);
-      
-      interface OrderWithDelivery extends OrderDTO {
-        deliveryLat?: number;
-        deliveryLng?: number;
-      }
-      const orderWithDelivery = order as OrderWithDelivery;
-      const lat = orderWithDelivery.deliveryLat;
-      const lng = orderWithDelivery.deliveryLng;
-      if (lat == null || lng == null || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
-        toast.error('Delivery coordinates are required. Add a delivery address with location before booking.');
+
+    const addressText = order.deliveryAddress?.trim() || '';
+    let latitude: number;
+    let longitude: number;
+    let addressForDispatch = addressText || 'Delivery address not specified';
+
+    const lat = order.deliveryLat;
+    const lng = order.deliveryLng;
+    const hasCoords = lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+
+    if (hasCoords) {
+      latitude = Number(lat);
+      longitude = Number(lng);
+    } else if (addressText) {
+      try {
+        const res = await api.post<{ success?: boolean; data?: { results?: Array<{ latitude: number; longitude: number; formattedAddress?: string }> }; error?: { message?: string } }>('/geo/geocode', { address: addressText });
+        const results = res.data?.data?.results;
+        if (results?.length && Number.isFinite(results[0].latitude) && Number.isFinite(results[0].longitude)) {
+          latitude = results[0].latitude;
+          longitude = results[0].longitude;
+          if (results[0].formattedAddress) addressForDispatch = results[0].formattedAddress;
+        } else {
+          toast.error("We couldn't verify the delivery address. Ask the patient to add a delivery address with location, or try again.");
+          return;
+        }
+      } catch (geocodeErr: unknown) {
+        const geo = geocodeErr as { response?: { data?: { error?: { message?: string } }; status?: number } };
+        const geoMsg = geo?.response?.data?.error?.message;
+        if (geo?.response?.status === 503) {
+          toast.error(geoMsg || 'Geocoding is not available. Add a delivery address with location to book dispatch.');
+        } else {
+          toast.error("We couldn't verify the delivery address. Ask the patient to add a delivery address with location, or try again.");
+        }
         return;
       }
-      const deliveryAddress = {
-        latitude: Number(lat),
-        longitude: Number(lng),
-        address: order.deliveryAddress || 'Delivery address not specified',
-      };
+    } else {
+      toast.error('Delivery coordinates are required. Add a delivery address with location before booking.');
+      return;
+    }
 
+    try {
+      setIsReadyPending(true);
+      const deliveryAddress = { latitude, longitude, address: addressForDispatch };
       const updated = await ordersService.bookDispatch(order.orderId, deliveryAddress);
       setOrder(updated);
       toast.success('Dispatch booked successfully!');
