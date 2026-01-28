@@ -551,6 +551,23 @@ export default function SignupPage() {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="e.g. 08012345678 or +2348012345678"
+                    {...registerField('phone')}
+                    disabled={isLoading}
+                  />
+                  {errors.phone && (
+                    <p className="text-sm text-destructive">{errors.phone.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Required for your account. Used for dispatch contact (rider can call you).
+                  </p>
+                </div>
+
                 {/* Password Strength Indicator */}
                 {watch('password') && (
                   <PasswordStrength password={watch('password') || ''} />
@@ -713,6 +730,7 @@ export default function SignupPage() {
                     <h4 className="font-medium">Personal Information</h4>
                     <p className="text-sm text-muted-foreground">
                       {watch('firstName')} {watch('lastName')} ({watch('email')})
+                      {watch('phone') && ` · ${watch('phone')}`}
                     </p>
                   </div>
                   
