@@ -206,35 +206,72 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
       console.error('Order creation failed:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
-      console.error('Request headers:', error.config?.headers);
-      console.error('Request data:', error.config?.data);
-      
-      // Better error messages based on status code
-      let errorMessage = 'Failed to create order';
+
+      // Extract error details from backend
+      const errorData = error.response?.data?.error || {};
+      const errorCode = errorData.code;
+      const errorField = errorData.field;
+      const userMessage = errorData.userMessage || errorData.message;
+      const suggestion = errorData.suggestion;
+
+      // User-friendly error messages based on error code
+      let errorTitle = 'Failed to create order';
+      let errorDescription = '';
+
       if (error.response?.status === 400) {
-        const errorCode = error.response?.data?.error?.code;
-        if (errorCode === 'MISSING_IDEMPOTENCY_KEY') {
-          errorMessage = 'Missing Idempotency-Key header. Please refresh and try again.';
-        } else if (errorCode === 'INVALID_PAYLOAD') {
-          errorMessage = 'Invalid order data. Please check all fields are filled correctly.';
-        } else if (errorCode === 'NOT_PARTICIPANT') {
-          errorMessage = 'You are not a participant in this chat room.';
-        } else {
-          errorMessage = 'Invalid order data. Please check all fields are filled correctly.';
+        switch (errorCode) {
+          case 'INVALID_DOSAGE_SIG':
+            errorTitle = 'Invalid Dosage Instructions';
+            errorDescription = suggestion || 'Please enter proper dosage instructions like "1 tablet twice daily"';
+            // Highlight the field with the error
+            const dosageField = document.querySelector(`[id^="dosageSig-"]`);
+            if (dosageField) {
+              (dosageField as HTMLElement).focus();
+              dosageField.classList.add('border-red-500');
+              setTimeout(() => dosageField.classList.remove('border-red-500'), 3000);
+            }
+            break;
+          case 'MISSING_IDEMPOTENCY_KEY':
+            errorTitle = 'Request Error';
+            errorDescription = 'Please refresh the page and try again.';
+            break;
+          case 'INVALID_PAYLOAD':
+            errorTitle = 'Invalid Order Data';
+            errorDescription = 'Please check all fields are filled correctly.';
+            break;
+          case 'NOT_PARTICIPANT':
+            errorTitle = 'Access Denied';
+            errorDescription = 'You are not a participant in this chat room.';
+            break;
+          case 'INVALID_DRUG_NAME':
+            errorTitle = 'Invalid Drug Name';
+            errorDescription = suggestion || 'Please enter a valid drug name.';
+            break;
+          default:
+            errorTitle = 'Validation Error';
+            errorDescription = userMessage || 'Please check all fields are filled correctly.';
         }
       } else if (error.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please log in again.';
+        errorTitle = 'Session Expired';
+        errorDescription = 'Please log in again to continue.';
       } else if (error.response?.status === 403) {
-        errorMessage = 'You do not have permission to create orders in this chat room.';
+        errorTitle = 'Permission Denied';
+        errorDescription = 'You do not have permission to create orders in this chat.';
       } else if (error.response?.status === 404) {
-        errorMessage = 'Chat room not found. Please refresh and try again.';
+        errorTitle = 'Chat Not Found';
+        errorDescription = 'This chat room no longer exists. Please refresh the page.';
       } else if (error.response?.status === 409) {
-        errorMessage = 'Duplicate order detected. Please try again.';
+        errorTitle = 'Duplicate Order';
+        errorDescription = 'This order may have already been created. Please check your orders.';
       } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+        errorDescription = error.response.data.message;
       }
-      
-      toast.error(errorMessage);
+
+      // Show toast with title and description
+      toast.error(errorTitle, {
+        description: errorDescription,
+        duration: 5000,
+      });
     } finally {
       setLoading(false);
     }
@@ -361,12 +398,15 @@ export function OrderForm({ roomId, onOrderCreated }: OrderFormProps) {
                       <Label htmlFor={`dosageSig-${drug.id}`}>Dosage Instructions *</Label>
                       <Textarea
                         id={`dosageSig-${drug.id}`}
-                        placeholder="e.g., 2 tablets every 6 hours"
+                        placeholder="e.g., 1 tablet twice daily, Take 2 capsules every 6 hours, Apply as needed"
                         value={drug.dosageSig}
                         onChange={(e) => updateDrug(drug.id, 'dosageSig', e.target.value)}
                         rows={2}
                         required
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Include quantity, frequency, or timing (e.g., "1 tablet twice daily", "Take as directed")
+                      </p>
                     </div>
 
                     <div className="space-y-2">

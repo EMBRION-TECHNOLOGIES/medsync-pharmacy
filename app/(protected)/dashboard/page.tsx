@@ -89,7 +89,11 @@ function StatCard({
       onClick={onClick}
     >
       <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4">
+          {/* Icon above text (fixes alignment at 1024px–1600px) */}
+          <div className={`inline-flex w-fit p-3 rounded-xl ${colorClasses[color]}`}>
+            <Icon className="h-5 w-5" />
+          </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <p className="text-sm font-medium text-muted-foreground">{title}</p>
@@ -112,9 +116,6 @@ function StatCard({
                 <span>{trendValue}</span>
               </div>
             )}
-          </div>
-          <div className={`p-3 rounded-xl ${colorClasses[color]}`}>
-            <Icon className="h-5 w-5" />
           </div>
         </div>
       </CardContent>

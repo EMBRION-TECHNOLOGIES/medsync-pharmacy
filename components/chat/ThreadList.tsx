@@ -15,7 +15,7 @@ interface ThreadListProps {
 
 export function ThreadList({ threads, selectedThreadId, onSelectThread }: ThreadListProps) {
   return (
-    <ScrollArea className="h-[calc(100vh-150px)] sm:h-[calc(100vh-200px)]">
+    <ScrollArea className="h-full min-h-0 flex-1">
       <div className="space-y-2 p-2 sm:p-3">
         {threads.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">

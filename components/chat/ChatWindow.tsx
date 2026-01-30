@@ -29,6 +29,15 @@ interface MessageBubbleProps {
   onOrderClick?: (orderId: string) => void;
 }
 
+interface OrderStatusPayload {
+  status?: string;
+  orderId?: string;
+  orderCode?: string;
+  message?: string;
+  additionalInfo?: string;
+  timestamp?: string;
+}
+
 function formatTime(date: Date | string): string {
   const d = new Date(date);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -82,14 +91,14 @@ function MessageBubble({ message, isCurrentUser, showDateSeparator, dateLabel, o
 
   // Order status card
   if (isOrderStatus) {
-    let orderData: any = null;
+    let orderData: OrderStatusPayload | null = null;
     let displayText = 'Order Update';
     
     try {
       // Extract JSON after [ORDER_STATUS] tag
       const jsonMatch = message.content?.match(/\[ORDER_STATUS\](.+)$/);
       if (jsonMatch && jsonMatch[1]) {
-        orderData = JSON.parse(jsonMatch[1]);
+        orderData = JSON.parse(jsonMatch[1]) as OrderStatusPayload;
         
         // Format status text
         const status = (orderData.status || '').toLowerCase();
@@ -177,7 +186,7 @@ function MessageBubble({ message, isCurrentUser, showDateSeparator, dateLabel, o
               : 'bg-muted text-foreground rounded-bl-md'
           )}
         >
-          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+          <p className="text-sm whitespace-pre-wrap wrap-break-word">{message.content}</p>
           <p className={cn(
             'text-[10px] mt-1',
             isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -204,11 +213,9 @@ function DateSeparator({ label }: { label: string }) {
 
 export function ChatWindow({
   messages,
-  patientId,
   onSend,
   roomId,
-  onQuickAction,
-  onOrderCreated
+  onOrderCreated,
 }: ChatWindowProps) {
   const { user } = useAuth();
   const [inputText, setInputText] = useState('');
@@ -268,7 +275,7 @@ export function ChatWindow({
 
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)] sm:h-[calc(100vh-300px)] text-muted-foreground p-4">
+      <div className="flex items-center justify-center flex-1 min-h-0 text-muted-foreground p-4">
         <div className="text-center space-y-3 sm:space-y-4">
           <MessageSquare className="h-12 w-12 sm:h-16 sm:w-16 mx-auto opacity-50" />
           <p className="text-sm sm:text-base">No messages yet</p>
@@ -282,11 +289,11 @@ export function ChatWindow({
   }
 
   return (
-    <div className="h-[calc(100vh-200px)] sm:h-[calc(100vh-300px)] flex flex-col">
-      {/* Messages Container */}
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Messages Container - only this scrolls */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-1"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-1 min-h-0"
       >
         {processedMessages.map(({ message, showDateSeparator, dateLabel, isCurrentUser }) => (
           <MessageBubble
@@ -301,38 +308,35 @@ export function ChatWindow({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t bg-background">
+      {/* Input Area - minimal gap at bottom */}
+      <div className="border-t bg-background shrink-0">
         {/* Quick Actions */}
         {roomId && (
-          <div className="p-2 sm:p-3 border-b bg-muted/20">
+          <div className="px-2 py-1.5 sm:px-2 sm:py-2 border-b bg-muted/20">
             <div className="flex gap-1 sm:gap-2 flex-wrap">
-              {/* Order Creation */}
               <OrderForm
                 roomId={roomId}
                 onOrderCreated={onOrderCreated}
               />
-
-              {/* Other Quick Actions - Add Note / Escalate hidden (were for testing) */}
             </div>
           </div>
         )}
 
-        {/* Message Input */}
-        <div className="p-3 flex gap-2 items-end">
+        {/* Message Input - reduced padding, small bottom gap */}
+        <div className="px-2 py-4 flex gap-1 items-end">
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 resize-none rounded-full bg-muted px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-24 min-h-[40px]"
+            className="flex-1 resize-none rounded-full bg-muted px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-24 min-h-[36px]"
             rows={1}
           />
           <Button
             onClick={handleSend}
             disabled={!inputText.trim()}
             size="icon"
-            className="rounded-full h-10 w-10 shrink-0"
+            className="rounded-full h-9 w-9 shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>

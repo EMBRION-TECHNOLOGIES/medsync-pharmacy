@@ -58,7 +58,13 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
 
   const orderStatus = ((order as any).status ?? (order as any).orderStatus ?? '').toString().toUpperCase();
   const canDispense = orderStatus === 'CONFIRMED' && orderStatus !== 'PREPARED' && orderStatus !== 'DISPENSED' && orderStatus !== 'DELIVERED';
-  const displayDate = (order as any).createdAt ?? (order as any).updatedAt;
+  // Date: support both camelCase and snake_case from API
+  const displayDate =
+    (order as any).createdAt ??
+    (order as any).created_at ??
+    (order as any).updatedAt ??
+    (order as any).updated_at;
+  const orderCode = (order as any).orderCode ?? (order as any).order_code;
 
   const handleDispense = () => {
     const items = ((order as any).items ?? []).map((item: any) => ({
@@ -81,13 +87,16 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             <Package className="h-5 w-5" />
             Order Details
           </DialogTitle>
-          <DialogDescription>
-            Order ID: {order.id}
+          <DialogDescription className="space-y-1">
+            {orderCode && (
+              <span className="block font-medium text-foreground">Order: {orderCode}</span>
+            )}
+            <span className="block text-xs text-muted-foreground">ID: {order.id}</span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Status */}
+          {/* Status and date */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
@@ -95,7 +104,7 @@ export function OrderDetail({ order, open, onOpenChange }: OrderDetailProps) {
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              {formatDate((order as any).createdAt ?? (order as any).updatedAt)}
+              {formatDate(displayDate)}
             </div>
           </div>
 

@@ -63,14 +63,34 @@ export const chatOrdersService = {
 
   async getOrder(id: string): Promise<Order> {
     const response = await api.get(`/chat-orders/${id}`);
-    // API interceptor may unwrap { success: true, data: order } to order, or leave data as { order }
+    // API interceptor unwraps { success: true, data: order } so response.data is the order
     const raw = response.data?.order ?? response.data?.data ?? response.data;
     if (!raw || typeof raw !== 'object') return response.data as Order;
-    // Ensure date and status exist for Order Details modal (backend Prisma has createdAt/updatedAt/status)
+    const r = raw as Record<string, unknown>;
+    // Normalize date: backend may send createdAt (camelCase) or created_at (snake_case); must be a valid date string (scrub can turn Date into {})
+    const rawCreated =
+      (r.createdAt as string) ??
+      (r.created_at as string) ??
+      (r.updatedAt as string) ??
+      (r.updated_at as string);
+    const createdAt =
+      typeof rawCreated === 'string' && rawCreated && !isNaN(Date.parse(rawCreated))
+        ? rawCreated
+        : new Date().toISOString();
+    // Normalize status (backend often sends orderStatus)
+    const status = (r.status ?? r.orderStatus) as OrderStatus | undefined;
     const order = { ...raw } as Order;
-    if (!order.createdAt && (raw as any).updatedAt) order.createdAt = (raw as any).updatedAt;
-    if (!order.createdAt) order.createdAt = new Date().toISOString();
-    if (!order.status && (raw as any).orderStatus) order.status = (raw as any).orderStatus as OrderStatus;
+    (order as Record<string, unknown>).createdAt = createdAt;
+    const rawUpdated = (r.updatedAt ?? r.updated_at ?? createdAt) as string;
+    const updatedAt =
+      typeof rawUpdated === 'string' && rawUpdated && !isNaN(Date.parse(rawUpdated))
+        ? rawUpdated
+        : createdAt;
+    (order as Record<string, unknown>).updatedAt = updatedAt;
+    if (status) order.status = status;
+    // Ensure orderCode is available for display (backend Prisma: orderCode)
+    if (!(order as Record<string, unknown>).orderCode && r.orderCode)
+      (order as Record<string, unknown>).orderCode = r.orderCode;
     return order;
   },
 

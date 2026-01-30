@@ -84,6 +84,10 @@ export class SocketService {
       this.handlers.onChatMessage?.(m);
     });
 
+    s.on('message:new', (m) => {
+      this.handlers.onChatMessage?.(m);
+    });
+
     s.on('order:new', (o) => {
       console.log('New order:', o);
       this.handlers.onOrderNew?.(o);

@@ -89,12 +89,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleTyping = (isTyping: boolean) => {
-    if (selectedThread) {
-      socket.sendTyping(selectedThread.id, isTyping);
-    }
-  };
-
   const handleOrderCreated = (orderId: string) => {
     console.log('Order created:', orderId);
     // Refresh chat data to show new order
@@ -135,7 +129,7 @@ export default function ChatPage() {
   }, [searchParams, chatRooms]);
 
   // Handle thread selection - hide thread list on mobile
-  const handleSelectThread = (thread: ChatRoom) => {
+  const handleSelectThread: (thread: ChatRoom) => void = (thread) => {
     setSelectedThread(thread);
     setShowThreadList(false); // Hide thread list on mobile
   };
@@ -147,9 +141,9 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between px-2 sm:px-0">
+    <div className="flex flex-col h-[calc(100vh-4rem)] min-h-0 overflow-hidden">
+      {/* Header - fixed, no scroll */}
+      <div className="flex items-center justify-between px-2 sm:px-0 shrink-0 py-2 sm:py-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Chat</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
@@ -162,14 +156,14 @@ export default function ChatPage() {
         </Button>
       </div>
 
-      {/* Chat Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Thread List - Hidden on mobile when thread is selected */}
-        <Card className={`lg:col-span-1 ${showThreadList ? 'block' : 'hidden lg:block'}`}>
-          <CardHeader className="pb-3">
+      {/* Chat Interface - fixed height, only inner streams scroll */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 flex-1 min-h-0 overflow-hidden">
+        {/* Thread List - scrolls inside (py-0 overrides Card default py-6) */}
+        <Card className={`lg:col-span-1 flex flex-col min-h-0 overflow-hidden py-0 gap-2 ${showThreadList ? 'flex' : 'hidden lg:flex'}`}>
+          <CardHeader className="pb-2 pt-3 px-3 shrink-0">
             <CardTitle className="text-base sm:text-lg">Conversations</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 flex-1 min-h-0 overflow-hidden flex flex-col">
             {threadsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -184,10 +178,9 @@ export default function ChatPage() {
           </CardContent>
         </Card>
 
-        {/* Chat Window - Full width on mobile when thread is selected */}
-        <Card className={`${showThreadList ? 'hidden lg:flex lg:col-span-2' : 'flex lg:col-span-2'} flex-col`}>
-          <CardHeader className="pb-3">
-            {/* Mobile back button */}
+        {/* Chat Window - messages stream scrolls inside (py-0 overrides Card default py-6) */}
+        <Card className={`${showThreadList ? 'hidden lg:flex lg:col-span-2' : 'flex lg:col-span-2'} flex-col min-h-0 overflow-hidden py-0 gap-2`}>
+          <CardHeader className="pb-2 pt-3 px-3 shrink-0">
             <div className="flex items-center gap-2">
               <button
                 onClick={handleBackToThreads}
@@ -210,7 +203,7 @@ export default function ChatPage() {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 p-0 flex flex-col min-h-0">
+          <CardContent className="flex-1 p-0 flex flex-col min-h-0 overflow-hidden">
             {selectedThread ? (
               <ChatWindow 
                 messages={messages?.messages || []} 
@@ -223,7 +216,7 @@ export default function ChatPage() {
                 onOrderCreated={handleOrderCreated}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground p-4">
+              <div className="flex items-center justify-center flex-1 text-muted-foreground p-4">
                 <div className="text-center">
                   <MessageSquare className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-50" />
                   <p className="text-sm sm:text-base">Select a conversation to start chatting</p>

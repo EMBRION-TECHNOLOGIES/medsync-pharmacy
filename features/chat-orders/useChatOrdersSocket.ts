@@ -66,29 +66,68 @@ export function useChatOrdersSocket() {
         console.log('Socket disconnected');
       },
       onChatMessage: (message) => {
-        console.log('📨 Message received:', message.content);
-        
-        const messageData = message.message || message;
-        const roomId = messageData.roomId;
-        
+        // Socket payloads vary:
+        // - Canonical: { id, roomId, content, senderId, senderType, createdAt, ... }
+        // - Legacy wrapper: { message: { ...canonical } }
+        // - Some payloads also include a `message` string field (human preview), which MUST NOT be treated as the wrapper.
+        const wrapped = message?.message;
+        const messageData =
+          wrapped && typeof wrapped === 'object' && (wrapped.roomId || wrapped.chatRoomId)
+            ? wrapped
+            : message;
+
+        const roomId =
+          messageData?.roomId ??
+          messageData?.chatRoomId ??
+          message?.roomId ??
+          message?.chatRoomId;
+
         if (!roomId) {
-          console.error('No roomId in message');
+          console.error('No roomId in socket message payload', { message });
           return;
         }
-        
-        console.log('Updating cache for roomId:', roomId);
-        
-        // Update messages cache
-        queryClient.setQueriesData({ queryKey: ['messages'], predicate: (query) => query.queryKey[1] === roomId }, (old: any) => {
-          const existing = old?.messages?.find((m: any) => m.id === messageData.id);
-          if (existing) return old;
-          
-          if (!old) {
-            return { messages: [messageData] };
+
+        console.log('📨 Socket message received for room:', roomId);
+
+        const createdAtRaw = messageData?.createdAt ?? messageData?.timestamp ?? new Date().toISOString();
+        const createdAt =
+          createdAtRaw instanceof Date ? createdAtRaw.toISOString() : String(createdAtRaw);
+
+        const rawContent =
+          messageData?.content ??
+          (typeof messageData?.message === 'string' ? messageData.message : undefined) ??
+          (typeof message?.content === 'string' ? message.content : undefined) ??
+          (typeof message?.message === 'string' ? message.message : '');
+
+        // Normalize socket message to match API shape (our UI reads `content` + `senderType`)
+        const normalizedMessage = {
+          ...messageData,
+          roomId,
+          createdAt,
+          content: String(rawContent ?? ''),
+          senderId: messageData?.senderId ?? messageData?.userId ?? message?.senderId ?? message?.userId,
+          senderType: String(messageData?.senderType ?? message?.senderType ?? 'system').toLowerCase(),
+        };
+
+        // Update messages cache so the open chat room shows the new message immediately
+        queryClient.setQueriesData(
+          { queryKey: ['messages'], predicate: (query) => query.queryKey[1] === roomId },
+          (old: any) => {
+            const existing = old?.messages?.find((m: any) => m.id === normalizedMessage.id);
+            if (existing) return old;
+            if (!old) {
+              return { messages: [normalizedMessage], total: 1, page: 1, limit: 50, totalPages: 1 };
+            }
+            return {
+              ...old,
+              messages: [...(old.messages || []), normalizedMessage],
+              total: (old.total ?? 0) + 1,
+            };
           }
-          
-          return { ...old, messages: [...(old.messages || []), messageData] };
-        });
+        );
+
+        // Invalidate messages so the open chat room refetches and stays in sync (handles ordering / duplicates)
+        queryClient.invalidateQueries({ queryKey: ['messages', roomId] });
         
         // Update chat list - ADD ROOM IF IT DOESN'T EXIST
         queryClient.setQueriesData({ queryKey: ['chat-orders', { scope: 'pharmacy', pharmacyId }] }, (old: any) => {
@@ -120,11 +159,11 @@ export function useChatOrdersSocket() {
             console.log('Adding new room to list:', roomId);
             const newRoom = {
               id: roomId,
-              lastMessage: messageData,
+              lastMessage: normalizedMessage,
               unreadCount: 1,
-              updatedAt: messageData.timestamp || messageData.createdAt || new Date().toISOString(),
+              updatedAt: normalizedMessage.createdAt || new Date().toISOString(),
               participants: [
-                { id: messageData.senderId, type: 'PATIENT', name: messageData.senderName || 'Patient' }
+                { id: normalizedMessage.senderId, type: 'PATIENT', name: (messageData as any)?.senderName || 'Patient' }
               ]
             };
             
@@ -140,9 +179,9 @@ export function useChatOrdersSocket() {
             if (room.id === roomId) {
               return {
                 ...room,
-                lastMessage: messageData,
+                lastMessage: normalizedMessage,
                 unreadCount: (room.unreadCount || 0) + 1,
-                updatedAt: messageData.timestamp || messageData.createdAt || new Date().toISOString()
+                updatedAt: normalizedMessage.createdAt || new Date().toISOString()
               };
             }
             return room;
@@ -166,6 +205,13 @@ export function useChatOrdersSocket() {
         queryClient.invalidateQueries({ queryKey: ['chat-orders', { scope: 'pharmacy', pharmacyId }] });
         queryClient.invalidateQueries({ queryKey: ['orders', pharmacyId] });
         
+        // Refetch messages for the room so the chat stream shows the new [ORDER_STATUS] message
+        const roomId = order.roomId ?? order.room_id;
+        if (roomId) {
+          queryClient.invalidateQueries({ queryKey: ['messages', roomId] });
+          console.log('✅ Messages invalidated for room:', roomId, '(order update will appear in chat stream)');
+        }
+        
         console.log('✅ Cache invalidated for new order');
         
         // Show notification
@@ -187,6 +233,12 @@ export function useChatOrdersSocket() {
         queryClient.invalidateQueries({ queryKey: ['orders', pharmacyId] });
         queryClient.invalidateQueries({ queryKey: ['chat-orders', { scope: 'pharmacy', pharmacyId }] });
         queryClient.invalidateQueries({ queryKey: ['chat-orders'] });
+        
+        // Refetch messages for the room so the chat stream shows [ORDER_STATUS] updates
+        const roomId = order.roomId ?? order.room_id ?? order.order?.roomId;
+        if (roomId) {
+          queryClient.invalidateQueries({ queryKey: ['messages', roomId] });
+        }
         
         // 🔥 CRITICAL: Invalidate financials when order status changes (especially DELIVERED)
         queryClient.invalidateQueries({ queryKey: ['financials'] });

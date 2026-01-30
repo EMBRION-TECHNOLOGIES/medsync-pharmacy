@@ -263,7 +263,7 @@ export default function ProtectedLayout({
 
       <div className="lg:pl-64">
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="py-4 sm:py-6 px-2 sm:px-4 lg:px-8">
+        <main className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           {/* Test Mode Banner (AC-TEST-02) */}
           {isTestMode && (
             <div className="mb-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 dark:bg-purple-950 dark:border-purple-800">
