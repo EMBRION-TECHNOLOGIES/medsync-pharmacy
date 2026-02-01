@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ordersService, type OrderDTO } from '@/features/orders/service';
 import { useOrg } from '@/store/useOrg';
 import { OrdersTable } from '@/components/orders/OrdersTable';
@@ -16,11 +17,54 @@ import {
 import { OrderStatus } from '@/lib/zod-schemas';
 import { Search, Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 
+/** Filter values sent to API. Backend normalizes to DB status (PENDING, DELIVERED, etc.) */
+const FILTER_OPTIONS: { value: OrderStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All Status' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'PREPARING', label: 'Preparing' },
+  { value: 'PREPARED', label: 'Prepared' },
+  { value: 'DISPENSED', label: 'Dispensed' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for Delivery' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
+
+function urlStatusToFilter(urlStatus: string | null): OrderStatus | 'all' {
+  if (!urlStatus) return 'all';
+  const s = urlStatus.toUpperCase().replace('-', '_');
+  const valid = FILTER_OPTIONS.find(o => o.value !== 'all' && o.value === s);
+  return valid ? (valid.value as OrderStatus) : 'all';
+}
+
 export default function OrdersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { pharmacyId, locationId, locationName } = useOrg();
-  const [status, setStatus] = useState<OrderStatus | 'all'>('all');
+  const [status, setStatus] = useState<OrderStatus | 'all'>(() => urlStatusToFilter(searchParams.get('status')));
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+
+  // Sync filter from URL when navigating (e.g. /orders?status=delivered)
+  useEffect(() => {
+    const urlStatus = urlStatusToFilter(searchParams.get('status'));
+    setStatus(urlStatus);
+  }, [searchParams]);
+
+  const handleStatusChange = (value: OrderStatus | 'all') => {
+    setStatus(value);
+    setPage(1); // Reset to first page when filter changes
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') {
+      params.delete('status');
+    } else {
+      params.set('status', value.toLowerCase().replace('_', '-'));
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  };
   const [pageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<OrderDTO[]>([]);
@@ -85,18 +129,17 @@ export default function OrdersPage() {
             className="pl-10"
           />
         </div>
-        <Select value={status} onValueChange={(value) => setStatus(value as OrderStatus | 'all')}>
-          <SelectTrigger className="w-full sm:w-[180px]">
+        <Select value={status} onValueChange={(value) => handleStatusChange(value as OrderStatus | 'all')}>
+          <SelectTrigger className="w-full sm:w-[200px]">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="dispensed">Dispensed</SelectItem>
-            <SelectItem value="declined">Declined</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
+            {FILTER_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

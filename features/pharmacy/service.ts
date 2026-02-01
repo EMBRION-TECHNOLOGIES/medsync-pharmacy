@@ -245,6 +245,8 @@ export const pharmacyService = {
     phone?: string;
     latitude?: number;
     longitude?: number;
+    openingTime?: string;
+    closingTime?: string;
     supervisor: {
       // For new supervisor
       firstName?: string;

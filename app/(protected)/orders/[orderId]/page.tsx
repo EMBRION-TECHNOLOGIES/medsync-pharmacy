@@ -37,6 +37,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
   const [otpOpen, setOtpOpen] = useState(false);
   const [isReadyPending, setIsReadyPending] = useState(false);
   const [itemsModalOpen, setItemsModalOpen] = useState(false);
+  const [simulatePending, setSimulatePending] = useState(false);
+  const [resetSimulatePending, setResetSimulatePending] = useState(false);
+
+  /** Development-only: show Dispatch Lifecycle Simulator (UI/UX observation). */
+  const showSimulator =
+    process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_DISPATCH_SIMULATOR === 'true';
   
   // Track delivery for active delivery statuses
   const orderStatus = (order?.orderStatus || '').toUpperCase();
@@ -396,11 +402,67 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
                 });
                 
                 return isDispensed && isPaid && notBooked ? (
+                <>
                 <Button onClick={bookDispatch} disabled={isReadyPending}>
                     📦 Book Dispatch
                 </Button>
+                {showSimulator && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!order || simulatePending) return;
+                      setSimulatePending(true);
+                      try {
+                        const result = await ordersService.startDispatchSimulation(order.orderId);
+                        if (result.success) {
+                          toast.success(result.message ?? 'Simulation started; status updates every 30s');
+                          await load();
+                        } else {
+                          toast.error(result.message ?? 'Simulation failed');
+                        }
+                      } catch (e) {
+                        const err = e as { response?: { data?: { error?: string } }; message?: string };
+                        toast.error(err.response?.data?.error ?? err.message ?? 'Failed to start simulation');
+                      } finally {
+                        setSimulatePending(false);
+                      }
+                    }}
+                    disabled={simulatePending}
+                  >
+                    {simulatePending ? 'Starting…' : 'Simulate Dispatch'}
+                  </Button>
+                )}
+                </>
                 ) : null;
               })()}
+
+              {/* Reset Simulation - dev only, when order has an active dispatch */}
+              {showSimulator && order?.dispatch?.id && (order.orderStatus === 'OUT_FOR_DELIVERY' || order.orderStatus === 'DISPENSED') && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!order || resetSimulatePending) return;
+                    setResetSimulatePending(true);
+                    try {
+                      const result = await ordersService.resetDispatchSimulation({ orderId: order.orderId });
+                      if (result.success) {
+                        toast.success(result.message ?? 'Simulation reset');
+                        await load();
+                      } else {
+                        toast.error(result.message ?? 'Reset failed (not a simulation?)');
+                      }
+                    } catch (e) {
+                      const err = e as { response?: { data?: { error?: string } }; message?: string };
+                      toast.error(err.response?.data?.error ?? err.message ?? 'Failed to reset');
+                    } finally {
+                      setResetSimulatePending(false);
+                    }
+                  }}
+                  disabled={resetSimulatePending}
+                >
+                  {resetSimulatePending ? 'Resetting…' : 'Reset Simulation'}
+                </Button>
+              )}
 
               {/* OTP Verification - REMOVED - Only patients can confirm delivery */}
 

@@ -60,6 +60,8 @@ export const pharmacyRegistrationSchema = z.object({
   latitude: z.number().min(-90).max(90, 'Invalid latitude').optional(),
   longitude: z.number().min(-180).max(180, 'Invalid longitude').optional(),
   description: z.string().optional(),
+  openingTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Use HH:mm format (e.g. 08:00)').optional().default('08:00'),
+  closingTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Use HH:mm format (e.g. 20:00)').optional().default('20:00'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -94,8 +96,8 @@ export type Tokens = z.infer<typeof tokensSchema>;
 export type AuthUser = z.infer<typeof authUserSchema>;
 export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
 
-// Order schemas - Updated to match API
-export const orderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'DISPENSED', 'DELIVERED', 'CANCELLED']);
+// Order schemas - Updated to match API (uppercase = DB values)
+export const orderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PREPARING', 'PREPARED', 'DISPENSED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'COMPLETED']);
 
 export const orderItemSchema = z.object({
   id: z.string(),
@@ -259,13 +261,16 @@ export const locationSchema = z.object({
   id: z.string(),
   name: z.string(),
   address: z.string(),
+  city: z.string().optional(),
   phone: z.string().optional(),
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   pharmacyId: z.string(),
   isPrimary: z.boolean().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  openingTime: z.string().optional(), // HH:mm format
+  closingTime: z.string().optional(), // HH:mm format
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export type Pharmacy = z.infer<typeof pharmacySchema>;

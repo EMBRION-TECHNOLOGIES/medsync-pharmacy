@@ -33,14 +33,18 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  Info
+  Info,
+  MessageSquare,
+  ShoppingCart
 } from 'lucide-react';
 import { usePharmacyProfile, useLocations } from '@/features/pharmacy/hooks';
 import { useOrg } from '@/store/useOrg';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Pharmacy } from '@/lib/zod-schemas';
+import { Pharmacy, Location } from '@/lib/zod-schemas';
+import { LocationDialog } from '@/components/locations/LocationDialog';
 import { format } from 'date-fns';
 
 type GovernanceStatus = 'INCOMPLETE' | 'ACTIVE' | 'SUSPENDED';
@@ -143,6 +147,9 @@ export default function SettingsPage() {
   });
 
   const [activeTab, setActiveTab] = useState('general');
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const queryClient = useQueryClient();
 
   const handleNotificationToggle = (key: keyof typeof notifications) => {
     setNotifications(prev => {
@@ -511,6 +518,12 @@ export default function SettingsPage() {
                           <div>
                             <p className="font-medium">{location.name}</p>
                             <p className="text-sm text-muted-foreground">{location.address}</p>
+                            {(location.openingTime || location.closingTime) && (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {location.openingTime || '—'} – {location.closingTime || '—'}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -520,6 +533,18 @@ export default function SettingsPage() {
                           <Badge variant={location.isActive !== false ? 'default' : 'secondary'}>
                             {location.isActive !== false ? 'Active' : 'Inactive'}
                           </Badge>
+                          {isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingLocation(location);
+                                setLocationDialogOpen(true);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -764,10 +789,24 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Location Edit Dialog - Owner only */}
+        {pharmacyId && isOwner && (
+          <LocationDialog
+            pharmacyId={pharmacyId}
+            open={locationDialogOpen}
+            onOpenChange={(open) => {
+              setLocationDialogOpen(open);
+              if (!open) {
+                setEditingLocation(null);
+                queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
+              }
+            }}
+            location={editingLocation}
+            mode={editingLocation ? 'edit' : 'create'}
+          />
+        )}
       </div>
     </RoleGuard>
   );
 }
-
-// Import for MessageSquare used in notifications
-import { MessageSquare, ShoppingCart } from 'lucide-react';

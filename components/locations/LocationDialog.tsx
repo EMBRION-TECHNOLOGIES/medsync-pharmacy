@@ -22,6 +22,8 @@ import { AddressAutocomplete } from '@/components/ui/address-autocomplete';
 import { CheckCircle, AlertCircle, UserPlus, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { PasswordStrength, isPasswordValid } from '@/components/ui/password-strength';
 
+const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+
 const locationSchema = z.object({
   // Location fields
   name: z.string().min(1, 'Location name is required'),
@@ -30,6 +32,8 @@ const locationSchema = z.object({
   phone: z.string().min(1, 'Phone number is required'),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  openingTime: z.string().min(1, 'Opening time is required').regex(timeRegex, 'Use HH:mm format (e.g. 08:00)'),
+  closingTime: z.string().min(1, 'Closing time is required').regex(timeRegex, 'Use HH:mm format (e.g. 20:00)'),
   // Supervisor fields (required for new locations)
   supervisorFirstName: z.string().min(1, 'First name is required'),
   supervisorLastName: z.string().min(1, 'Last name is required'),
@@ -47,6 +51,8 @@ const editLocationSchema = z.object({
   phone: z.string().min(1, 'Phone number is required'),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  openingTime: z.string().min(1, 'Opening time is required').regex(timeRegex, 'Use HH:mm format (e.g. 08:00)'),
+  closingTime: z.string().min(1, 'Closing time is required').regex(timeRegex, 'Use HH:mm format (e.g. 20:00)'),
 });
 
 type LocationInput = z.infer<typeof locationSchema>;
@@ -87,6 +93,8 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
       phone: '',
       latitude: undefined,
       longitude: undefined,
+      openingTime: '08:00',
+      closingTime: '20:00',
       supervisorFirstName: '',
       supervisorLastName: '',
       supervisorEmail: '',
@@ -117,6 +125,8 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
           phone: location.phone || '',
           latitude: location.latitude || undefined,
           longitude: location.longitude || undefined,
+          openingTime: location.openingTime || '08:00',
+          closingTime: location.closingTime || '20:00',
           supervisorFirstName: '',
           supervisorLastName: '',
           supervisorEmail: '',
@@ -135,6 +145,8 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
           phone: '',
           latitude: undefined,
           longitude: undefined,
+          openingTime: '08:00',
+          closingTime: '20:00',
           supervisorFirstName: '',
           supervisorLastName: '',
           supervisorEmail: '',
@@ -271,6 +283,8 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
           phone: data.phone || undefined,
           latitude: data.latitude,
           longitude: data.longitude,
+          openingTime: data.openingTime || '08:00',
+          closingTime: data.closingTime || '20:00',
           supervisor: {
             firstName: data.supervisorFirstName,
             lastName: data.supervisorLastName,
@@ -301,6 +315,8 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
             phone: data.phone || undefined,
             latitude: data.latitude,
             longitude: data.longitude,
+            openingTime: data.openingTime || '08:00',
+            closingTime: data.closingTime || '20:00',
           },
         });
         toast.success('Location updated successfully');
@@ -505,6 +521,35 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
                 />
                 {errors.phone && (
                   <p className="text-sm text-destructive">{errors.phone.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="openingTime">Opening Time *</Label>
+                <Input
+                  id="openingTime"
+                  type="time"
+                  {...register('openingTime')}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">e.g. 08:00 (8 AM)</p>
+                {errors.openingTime && (
+                  <p className="text-sm text-destructive">{errors.openingTime.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="closingTime">Closing Time *</Label>
+                <Input
+                  id="closingTime"
+                  type="time"
+                  {...register('closingTime')}
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">e.g. 20:00 (8 PM)</p>
+                {errors.closingTime && (
+                  <p className="text-sm text-destructive">{errors.closingTime.message}</p>
                 )}
               </div>
             </div>

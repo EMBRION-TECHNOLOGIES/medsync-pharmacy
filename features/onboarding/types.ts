@@ -55,6 +55,8 @@ export interface CreatePharmacyInput {
   cacRegistrationNumber?: string;
   cacBusinessName?: string;
   initiatorRole: PharmacyRoleType;
+  openingTime?: string; // HH:mm format, e.g. "08:00"
+  closingTime?: string; // HH:mm format, e.g. "20:00"
 }
 
 

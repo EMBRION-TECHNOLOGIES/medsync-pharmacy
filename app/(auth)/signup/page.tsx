@@ -60,6 +60,10 @@ export default function SignupPage() {
     setValue,
   } = useForm<PharmacyRegistrationForm>({
     resolver: zodResolver(pharmacyRegistrationSchema),
+    defaultValues: {
+      openingTime: '08:00',
+      closingTime: '20:00',
+    },
   });
 
 
@@ -274,6 +278,8 @@ export default function SignupPage() {
         email: data.pharmacyEmail,
         pcnRegistrationNumber: normalizeLicense(data.licenseNumber),
         initiatorRole: 'PHARMACY_OWNER' as const,
+        openingTime: data.openingTime || '08:00',
+        closingTime: data.closingTime || '20:00',
       };
       
       if (isAuthenticated) {
@@ -441,6 +447,8 @@ export default function SignupPage() {
                 latitude: watch('latitude'),
                 longitude: watch('longitude'),
                 description: watch('description'),
+                openingTime: watch('openingTime') || '08:00',
+                closingTime: watch('closingTime') || '20:00',
               };
               onSubmitStep3(data);
             }
@@ -714,6 +722,37 @@ export default function SignupPage() {
                     </p>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="openingTime">Opening Time</Label>
+                      <Input
+                        id="openingTime"
+                        type="time"
+                        defaultValue="08:00"
+                        {...registerField('openingTime')}
+                        disabled={isLoading}
+                      />
+                      <p className="text-xs text-muted-foreground">e.g. 08:00 (8 AM)</p>
+                      {errors.openingTime && (
+                        <p className="text-sm text-destructive">{errors.openingTime.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="closingTime">Closing Time</Label>
+                      <Input
+                        id="closingTime"
+                        type="time"
+                        defaultValue="20:00"
+                        {...registerField('closingTime')}
+                        disabled={isLoading}
+                      />
+                      <p className="text-xs text-muted-foreground">e.g. 20:00 (8 PM)</p>
+                      {errors.closingTime && (
+                        <p className="text-sm text-destructive">{errors.closingTime.message}</p>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             ) : (
@@ -743,6 +782,9 @@ export default function SignupPage() {
                     <h4 className="font-medium">Pharmacy</h4>
                     <p className="text-sm text-muted-foreground">
                       {watch('pharmacyName')} - {watch('address') || 'Current Location'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Hours: {watch('openingTime') || '08:00'} – {watch('closingTime') || '20:00'}
                     </p>
                   </div>
                 </div>

@@ -57,6 +57,8 @@ export const useCreateLocation = (pharmacyId: string) => {
       phone?: string;
       latitude?: number;
       longitude?: number;
+      openingTime?: string;
+      closingTime?: string;
       supervisor: {
         firstName?: string;
         lastName?: string;

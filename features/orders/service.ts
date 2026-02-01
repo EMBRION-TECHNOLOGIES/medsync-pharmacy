@@ -519,5 +519,27 @@ export const ordersService = {
       throw error;
     }
   },
+
+  /** Start dispatch lifecycle simulation (dev/staging only). Status updates every 30s. */
+  async startDispatchSimulation(orderId: string): Promise<{ success: boolean; dispatchId?: string; message: string }> {
+    const response = await api.post<{ success: boolean; data?: { dispatchId?: string }; message: string }>(
+      '/dispatch/simulate',
+      { orderId }
+    );
+    return {
+      success: response.data.success,
+      dispatchId: response.data.data?.dispatchId,
+      message: response.data.message ?? (response.data.success ? 'Simulation started' : 'Failed'),
+    };
+  },
+
+  /** Reset dispatch simulation: roll back order, remove simulated dispatch and chat messages. */
+  async resetDispatchSimulation(params: { orderId?: string; dispatchId?: string }): Promise<{ success: boolean; message: string }> {
+    const response = await api.post<{ success: boolean; message: string }>(
+      '/dispatch/simulate/reset',
+      params
+    );
+    return { success: response.data.success, message: response.data.message ?? '' };
+  },
 };
 
