@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -56,7 +56,6 @@ const editLocationSchema = z.object({
 });
 
 type LocationInput = z.infer<typeof locationSchema>;
-type EditLocationInput = z.infer<typeof editLocationSchema>;
 
 interface LocationDialogProps {
   pharmacyId: string;
@@ -85,7 +84,7 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
     watch,
     formState: { errors },
   } = useForm<LocationInput>({
-    resolver: zodResolver(mode === 'create' ? locationSchema : editLocationSchema),
+    resolver: zodResolver(mode === 'create' ? locationSchema : editLocationSchema) as unknown as Resolver<LocationInput>,
     defaultValues: {
       name: '',
       address: '',
@@ -324,9 +323,10 @@ export function LocationDialog({ pharmacyId, open, onOpenChange, location, mode 
         reset();
         setIsAddressVerified(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save location:', error);
-      const errorMessage = error?.response?.data?.error?.message || error?.message || 'Failed to save location';
+      const err = error as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      const errorMessage = err?.response?.data?.error?.message || err?.message || 'Failed to save location';
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);

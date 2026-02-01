@@ -40,9 +40,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ orderId:
   const [simulatePending, setSimulatePending] = useState(false);
   const [resetSimulatePending, setResetSimulatePending] = useState(false);
 
-  /** Development-only: show Dispatch Lifecycle Simulator (UI/UX observation). */
-  const showSimulator =
-    process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_DISPATCH_SIMULATOR === 'true';
+  /** Development-only: show Dispatch Lifecycle Simulator. NEVER in production - no env var override. */
+  const showSimulator = process.env.NODE_ENV === 'development';
   
   // Track delivery for active delivery statuses
   const orderStatus = (order?.orderStatus || '').toUpperCase();
