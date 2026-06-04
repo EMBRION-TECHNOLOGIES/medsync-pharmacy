@@ -164,7 +164,7 @@ export function useLoadPharmacyContext(options: { enabled?: boolean } = {}) {
     queryKey: ['pharmacy-context', pharmacyId],
     queryFn: () => fetchPharmacyContext(pharmacyId!),
     enabled: queryEnabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000,
     retry: 1,
   });
 

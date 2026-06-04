@@ -15,8 +15,8 @@ import { getDefaultPermissions } from '@/lib/permissions';
 import Link from 'next/link';
 import type { GovernanceStatus, PharmacyRoleType } from '@/features/onboarding/types';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { SetupStatusAlert } from '@/components/governance/SetupStatusAlert';
+import type { PharmacyProfileResponse } from '@/features/pharmacy/service';
 
 export default function ProtectedLayout({
   children,
@@ -181,10 +181,6 @@ export default function ProtectedLayout({
       // Get permissions from the frontend permission config (single source of truth for UI permissions)
       const derivedPermissions = getDefaultPermissions(roleType as PharmacyRoleType);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/8742bb62-3513-4e7a-a664-beff543ec89f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'layout.tsx:setContext',message:'Layout setting pharmacy context',data:{pharmacyId:pharmacy.id,roleType,governanceStatus:govStatus,canOperate:canOp,approvalMode:mode,isTestMode:testMode,hasOpStatus:!!opStatus,permissionKeys:Object.keys(derivedPermissions),opStatusReasons:opStatus?.reasons},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H2'})}).catch(()=>{});
-      // #endregion
-
       // Always update context with latest data from backend
       setContext({
         pharmacyId: pharmacy.id,
@@ -219,26 +215,26 @@ export default function ProtectedLayout({
     );
   }
 
-  // Get governance status message
+  const profileOperationalStatus = (pharmacyProfile as PharmacyProfileResponse | null | undefined)
+    ?.operationalStatus;
+  const bannerGovernanceStatus =
+    profileOperationalStatus?.governanceStatus ?? governanceStatus;
+
   const getGovernanceMessage = () => {
-    switch (governanceStatus) {
+    switch (bannerGovernanceStatus) {
       case 'INCOMPLETE':
         return {
-          title: 'Setup Incomplete',
-          description: 'Add a Superintendent Pharmacist and create at least one location to activate your pharmacy.',
-          action: { href: '/pharmacy-team', label: 'Complete Setup' },
+          description:
+            profileOperationalStatus?.reasons?.join(' ') ||
+            'Complete pharmacy setup to activate orders and chat.',
         };
       case 'SUSPENDED':
         return {
-          title: 'Pharmacy Suspended',
           description: 'Your pharmacy has been suspended. Please contact support for assistance.',
-          action: { href: 'mailto:support@terasync.ng', label: 'Contact Support' },
         };
       default:
         return {
-          title: 'Pending Activation',
           description: 'Your pharmacy is pending activation.',
-          action: null,
         };
     }
   };
@@ -301,45 +297,12 @@ export default function ProtectedLayout({
             </div>
           )}
 
-          {/* Governance status warning (new system) */}
-          {!isAdmin && governanceStatus && governanceStatus !== 'ACTIVE' && (
-            <Alert className={`mb-6 ${
-              governanceStatus === 'SUSPENDED'
-                ? 'border-red-200 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100 dark:border-red-800'
-                : 'border-amber-200 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100 dark:border-amber-800'
-            }`}>
-              <AlertCircle className={`h-4 w-4 ${
-                governanceStatus === 'SUSPENDED'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-amber-600 dark:text-amber-400'
-              }`} />
-              <AlertTitle className={`${
-                governanceStatus === 'SUSPENDED'
-                  ? 'text-red-900 dark:text-red-100'
-                  : 'text-amber-900 dark:text-amber-100'
-              }`}>
-                {getGovernanceMessage().title}
-              </AlertTitle>
-              <AlertDescription className={`mt-2 ${
-                governanceStatus === 'SUSPENDED'
-                  ? 'text-red-800 dark:text-red-200'
-                  : 'text-amber-800 dark:text-amber-200'
-              }`}>
-                <p>{getGovernanceMessage().description}</p>
-                {getGovernanceMessage().action && (
-                  <Link
-                    href={getGovernanceMessage().action!.href}
-                    className={`mt-3 inline-flex items-center text-sm font-medium underline ${
-                      governanceStatus === 'SUSPENDED'
-                        ? 'text-red-700 dark:text-red-300'
-                        : 'text-amber-700 dark:text-amber-300'
-                    }`}
-                  >
-                    {getGovernanceMessage().action!.label} →
-                  </Link>
-                )}
-              </AlertDescription>
-            </Alert>
+          {/* Governance setup banner — driven by live operationalStatus from profile */}
+          {!isAdmin && (
+            <SetupStatusAlert
+              governanceStatus={bannerGovernanceStatus}
+              operationalStatus={profileOperationalStatus}
+            />
           )}
 
           {/* Blocked route content */}
@@ -355,13 +318,19 @@ export default function ProtectedLayout({
               </p>
 
               {/* Show governance-specific guidance */}
-              {governanceStatus === 'INCOMPLETE' && (
+              {bannerGovernanceStatus === 'INCOMPLETE' && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
                   <p className="font-medium">To complete activation:</p>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
-                    <li>Add a Superintendent Pharmacist to your team</li>
-                    <li>Create at least one pharmacy location</li>
-                    <li>Wait for admin approval</li>
+                    {!profileOperationalStatus?.requirements?.hasSuperintendent && (
+                      <li>Add a Superintendent Pharmacist to your team</li>
+                    )}
+                    {!profileOperationalStatus?.requirements?.hasLocations && (
+                      <li>Create at least one pharmacy location</li>
+                    )}
+                    {!profileOperationalStatus?.adminApproved && (
+                      <li>Wait for platform admin approval</li>
+                    )}
                   </ul>
                   <Link
                     href="/pharmacy-team"

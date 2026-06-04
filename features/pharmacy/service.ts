@@ -7,7 +7,7 @@ import type { Permissions } from '@/lib/permissions';
 type ApprovalMode = 'PRODUCTION' | 'TEST';
 
 // Operational status from backend (single source of truth)
-interface OperationalStatus {
+export interface OperationalStatus {
   canOperate: boolean;
   governanceStatus: GovernanceStatus;
   adminApproved: boolean;

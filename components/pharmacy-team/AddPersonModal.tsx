@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
 import { useAddPerson } from '@/features/pharmacy-team/hooks';
 import { useLocations } from '@/features/pharmacy/hooks';
@@ -55,6 +55,28 @@ export function AddPersonModal({ open, onOpenChange }: AddPersonModalProps) {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const emptyForm = {
+    name: '',
+    email: '',
+    phone: '',
+    roleType: '' as PharmacyRoleType | '',
+    password: '',
+    confirmPassword: '',
+    forcePasswordReset: true,
+    pcnNumber: '',
+    licenseExpiryDate: '',
+    locationId: '',
+  };
+
+  useEffect(() => {
+    if (open) {
+      setFormData(emptyForm);
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when dialog opens
+  }, [open]);
 
   const isPharmacistRole =
     formData.roleType === 'SUPERINTENDENT_PHARMACIST' ||
@@ -132,19 +154,7 @@ export function AddPersonModal({ open, onOpenChange }: AddPersonModalProps) {
         locationIds: isLocationScoped && formData.locationId ? [formData.locationId] : undefined,
       });
 
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        roleType: '' as PharmacyRoleType | '',
-        password: '',
-        confirmPassword: '',
-        forcePasswordReset: true,
-        pcnNumber: '',
-        licenseExpiryDate: '',
-        locationId: '',
-      });
+      setFormData(emptyForm);
 
       // Close modal on success (mutation's onSuccess will show toast)
       onOpenChange(false);

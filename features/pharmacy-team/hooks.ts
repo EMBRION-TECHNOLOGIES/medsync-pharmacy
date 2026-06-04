@@ -18,6 +18,7 @@ import {
   TeamMember,
 } from './service';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
+import { invalidatePharmacyOperationalQueries } from '@/lib/invalidatePharmacyQueries';
 import { toast } from 'sonner';
 
 /**
@@ -43,8 +44,7 @@ export function useAddPerson() {
   return useMutation({
     mutationFn: (data: AddPersonInput) => addPerson(pharmacyId!, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-team', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status', pharmacyId] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
       toast.success(data.message);
     },
     onError: (error: any) => {
@@ -64,9 +64,7 @@ export function useConfirmRole() {
     mutationFn: ({ personId, data }: { personId: string; data: ConfirmRoleInput }) =>
       confirmRoleInApp(pharmacyId!, personId, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-team', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-context'] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
       toast.success(data.message);
     },
     onError: (error: any) => {
@@ -86,8 +84,7 @@ export function useRemovePerson() {
     mutationFn: ({ personId, reason }: { personId: string; reason?: string }) =>
       removePerson(pharmacyId!, personId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-team', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status', pharmacyId] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
       toast.success('Team member removed. Access revoked.');
     },
     onError: (error: any) => {
@@ -107,8 +104,7 @@ export function useUpdatePerson() {
     mutationFn: ({ personId, data }: { personId: string; data: UpdatePersonInput }) =>
       updatePerson(pharmacyId!, personId, data),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-team', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status', pharmacyId] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
       toast.success(data.message || 'Team member updated successfully');
     },
     onError: (error: any) => {
@@ -127,8 +123,7 @@ export function useReactivatePerson() {
   return useMutation({
     mutationFn: (personId: string) => reactivatePerson(pharmacyId!, personId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy-team', pharmacyId] });
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status', pharmacyId] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
       toast.success(data.message || 'Team member reactivated successfully');
     },
     onError: (error: any) => {

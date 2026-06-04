@@ -51,9 +51,9 @@ export function EditPersonModal({ open, onOpenChange, member }: EditPersonModalP
     locationId: '',
   });
 
-  // Initialize form data when member changes
+  // Sync form when modal opens or team list refetches after save
   useEffect(() => {
-    if (member) {
+    if (open && member) {
       setFormData({
         name: member.name || '',
         phone: member.phone || '',
@@ -63,7 +63,7 @@ export function EditPersonModal({ open, onOpenChange, member }: EditPersonModalP
         locationId: member.locationId || '',
       });
     }
-  }, [member]);
+  }, [open, member]);
 
   const isPharmacistRole =
     formData.roleType === 'SUPERINTENDENT_PHARMACIST' ||

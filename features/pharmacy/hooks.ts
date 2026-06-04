@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pharmacyService } from './service';
 import { Location, PharmacyUser } from '@/lib/zod-schemas';
+import { invalidatePharmacyOperationalQueries } from '@/lib/invalidatePharmacyQueries';
 
 export const usePharmacy = (pharmacyId?: string) => {
   return useQuery({
@@ -16,7 +17,7 @@ export const usePharmacyProfile = (options: { enabled?: boolean } = {}) => {
     queryFn: () => pharmacyService.getPharmacyProfile(),
     enabled: options.enabled ?? true,
     retry: 1,
-    staleTime: 5 * 60 * 1000, // 5 minutes - reasonable cache time
+    staleTime: 30 * 1000, // Refresh often so setup banner stays in sync
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
     refetchOnMount: true, // Refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window regains focus
@@ -70,8 +71,7 @@ export const useCreateLocation = (pharmacyId: string) => {
       };
     }) => pharmacyService.createLocation(pharmacyId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
-      queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'staff'] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
     },
   });
 };
@@ -83,7 +83,7 @@ export const useUpdateLocation = (pharmacyId: string) => {
     mutationFn: ({ locationId, data }: { locationId: string; data: Partial<Location> }) =>
       pharmacyService.updateLocation(pharmacyId, locationId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
     },
   });
 };
@@ -94,7 +94,7 @@ export const useDeleteLocation = (pharmacyId: string) => {
   return useMutation({
     mutationFn: (locationId: string) => pharmacyService.deleteLocation(pharmacyId, locationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
+      invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
     },
   });
 };

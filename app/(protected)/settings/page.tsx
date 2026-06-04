@@ -40,6 +40,7 @@ import {
 import { usePharmacyProfile, useLocations } from '@/features/pharmacy/hooks';
 import { useOrg } from '@/store/useOrg';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidatePharmacyOperationalQueries } from '@/lib/invalidatePharmacyQueries';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -799,7 +800,7 @@ export default function SettingsPage() {
               setLocationDialogOpen(open);
               if (!open) {
                 setEditingLocation(null);
-                queryClient.invalidateQueries({ queryKey: ['pharmacy', pharmacyId, 'locations'] });
+                invalidatePharmacyOperationalQueries(queryClient, pharmacyId);
               }
             }}
             location={editingLocation}
