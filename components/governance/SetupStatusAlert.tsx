@@ -41,7 +41,12 @@ export function SetupStatusAlert({
   const adminApproved = operationalStatus?.adminApproved ?? false;
   const isTestMode = operationalStatus?.isTestMode ?? false;
 
-  const checklist = [
+  const checklist: Array<{
+    done: boolean;
+    label: string;
+    href: string | null;
+    hint?: string;
+  }> = [
     {
       done: req?.hasSuperintendent ?? false,
       label: 'Superintendent Pharmacist on your team',
@@ -57,18 +62,30 @@ export function SetupStatusAlert({
           {
             done: adminApproved,
             label: 'Platform admin approval',
-            href: null as string | null,
+            href: '/documents',
+            hint: adminApproved ? undefined : 'Email documents to admin@terasync.ng',
           },
         ]
       : []),
   ];
 
   const allMet = checklist.every((item) => item.done);
-  const title = allMet ? 'Setup complete — activating' : 'Setup Incomplete';
+  const onlyAwaitingAdmin =
+    (req?.hasSuperintendent ?? false) &&
+    (req?.hasLocations ?? false) &&
+    !adminApproved;
+  const title = onlyAwaitingAdmin && !adminApproved
+    ? 'Awaiting admin approval'
+    : allMet
+      ? 'Setup complete — activating'
+      : 'Setup Incomplete';
 
-  const description = allMet
-    ? 'All requirements are met. Your pharmacy should show as active shortly. Refresh if this banner persists.'
-    : 'Complete the items below to activate your pharmacy.';
+  const description =
+    onlyAwaitingAdmin && !adminApproved
+      ? 'Your team and location setup look good. Send verification documents for platform admin approval.'
+      : allMet
+        ? 'All requirements are met. Your pharmacy should show as active shortly. Refresh if this banner persists.'
+        : 'Complete the items below to activate your pharmacy.';
 
   return (
     <Alert className="mb-6 border-amber-200 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100 dark:border-amber-800">
@@ -86,11 +103,14 @@ export function SetupStatusAlert({
               )}
               <span className={item.done ? 'line-through opacity-70' : ''}>
                 {item.label}
+                {!item.done && item.hint && (
+                  <span className="block text-xs mt-0.5 opacity-90">{item.hint}</span>
+                )}
                 {!item.done && item.href && (
                   <>
                     {' — '}
                     <Link href={item.href} className="font-medium underline text-amber-700 dark:text-amber-300">
-                      fix now
+                      {item.label.includes('admin') ? 'view documents' : 'fix now'}
                     </Link>
                   </>
                 )}
@@ -98,12 +118,20 @@ export function SetupStatusAlert({
             </li>
           ))}
         </ul>
-        {!allMet && (
+        {!allMet && !onlyAwaitingAdmin && (
           <Link
             href="/pharmacy-team"
             className="mt-3 inline-flex items-center text-sm font-medium text-amber-700 underline dark:text-amber-300"
           >
             Complete Setup →
+          </Link>
+        )}
+        {onlyAwaitingAdmin && !adminApproved && (
+          <Link
+            href="/documents"
+            className="mt-3 inline-flex items-center text-sm font-medium text-amber-700 underline dark:text-amber-300"
+          >
+            Send verification documents →
           </Link>
         )}
       </AlertDescription>

@@ -53,8 +53,8 @@ export default function DocumentsPage() {
         <AlertTitle>Error Loading Documents</AlertTitle>
         <AlertDescription>
           {error instanceof Error ? error.message : 'Failed to load onboarding status. Please try again later.'}
-          <Link href="/onboarding" className="block mt-2 text-primary hover:underline">
-            Back to Onboarding →
+          <Link href="/dashboard" className="block mt-2 text-primary hover:underline">
+            Back to Dashboard →
           </Link>
         </AlertDescription>
       </Alert>
@@ -68,8 +68,8 @@ export default function DocumentsPage() {
         <AlertTitle>No Status Found</AlertTitle>
         <AlertDescription>
           Unable to retrieve pharmacy onboarding status. Please try refreshing the page.
-          <Link href="/onboarding" className="block mt-2 text-primary hover:underline">
-            Back to Onboarding →
+          <Link href="/dashboard" className="block mt-2 text-primary hover:underline">
+            Back to Dashboard →
           </Link>
         </AlertDescription>
       </Alert>
@@ -103,10 +103,10 @@ export default function DocumentsPage() {
     <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link href="/onboarding">
+          <Link href="/dashboard">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Onboarding
+              Back to Dashboard
             </Button>
           </Link>
         </div>

@@ -103,10 +103,10 @@ export default function DocumentsPage() {
     <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link href="/onboarding">
+          <Link href="/dashboard">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Onboarding
+              Back to Dashboard
             </Button>
           </Link>
         </div>

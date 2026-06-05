@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useOrg } from '@/store/useOrg';
-import { useAuth } from '@/features/auth/hooks';
 import { usePharmacyContext } from '@/store/usePharmacyContext';
 import { useOnboardingStatus } from '@/features/onboarding/hooks';
 import { GOVERNANCE_STATUS_DISPLAY } from '@/features/onboarding/types';
-import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,11 +23,8 @@ import {
 
 export default function OnboardingPage() {
   const { pharmacyId } = useOrg();
-  const { user } = useAuth();
-  const { roleType, isLoaded: isContextLoaded } = usePharmacyContext();
+  const { isLoaded: isContextLoaded } = usePharmacyContext();
   const { data: status, isLoading, error } = useOnboardingStatus(pharmacyId);
-
-  const isPharmacyOwner = user?.role === 'PHARMACY_OWNER';
 
   if (isLoading || !isContextLoaded) {
     return (
@@ -52,18 +48,6 @@ export default function OnboardingPage() {
           </AlertDescription>
         </Alert>
       </div>
-    );
-  }
-
-  if (!isPharmacyOwner) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Access Restricted</AlertTitle>
-        <AlertDescription>
-          Only pharmacy owners can access the onboarding dashboard.
-        </AlertDescription>
-      </Alert>
     );
   }
 
@@ -96,19 +80,16 @@ export default function OnboardingPage() {
   const hasLocations = safeStatus.statusDetails.hasLocations;
 
   return (
-    <PermissionGuard
-      roleTypes={['PHARMACY_OWNER']}
-      hideOnDenied={false}
+    <RoleGuard
+      allowedRoles={['PHARMACY_OWNER']}
       fallback={
-        <div className="space-y-6">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Loading Pharmacy Context</AlertTitle>
-            <AlertDescription>
-              Please wait while we load your pharmacy information.
-            </AlertDescription>
-          </Alert>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Restricted</AlertTitle>
+          <AlertDescription>
+            Only pharmacy owners can access the onboarding dashboard.
+          </AlertDescription>
+        </Alert>
       }
     >
       <div className="space-y-6">
@@ -164,7 +145,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 {!hasSuperintendent && (
-                  <Link href="/staff">
+                  <Link href="/pharmacy-team">
                     <Button size="sm" variant="outline">
                       <UserPlus className="h-4 w-4 mr-2" />
                       Add User
@@ -188,7 +169,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 {!hasLocations && (
-                  <Link href="/locations">
+                  <Link href="/settings">
                     <Button size="sm" variant="outline">
                       <MapPin className="h-4 w-4 mr-2" />
                       Add Location
@@ -236,9 +217,9 @@ export default function OnboardingPage() {
                     <p className="text-sm text-muted-foreground mb-2">
                       Create a user account for your Superintendent Pharmacist. They must have a valid PCN license.
                     </p>
-                    <Link href="/staff">
+                    <Link href="/pharmacy-team">
                       <Button size="sm">
-                        Go to Staff Management
+                        Go to Pharmacy Team
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </Link>
@@ -256,9 +237,9 @@ export default function OnboardingPage() {
                     <p className="text-sm text-muted-foreground mb-2">
                       Add at least one location (branch) for your pharmacy. Orders will be assigned to locations.
                     </p>
-                    <Link href="/locations">
+                    <Link href="/settings">
                       <Button size="sm">
-                        Go to Locations
+                        Go to Settings
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </Link>
@@ -315,6 +296,6 @@ export default function OnboardingPage() {
           </Alert>
         )}
       </div>
-    </PermissionGuard>
+    </RoleGuard>
   );
 }

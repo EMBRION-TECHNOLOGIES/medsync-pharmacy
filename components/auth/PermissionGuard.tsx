@@ -68,21 +68,20 @@ export function PermissionGuard({
 }: PermissionGuardProps) {
   const { permissions, roleType, canOperate, isLoaded } = usePharmacyContext();
 
-  // #region agent log
-  if (typeof window !== 'undefined') {
-    // Agent logging removed
+  if (!isLoaded) {
+    return hideOnDenied ? null : <>{fallback}</>;
   }
-  // #endregion
-  return hideOnDenied ? null : <>{fallback}</>;
 
   // Check active pharmacy requirement
   if (requireActive && !canOperate) {
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      // Agent logging removed
-    }
-    // #endregion
     return hideOnDenied ? null : <>{fallback}</>;
+  }
+
+  // Check required pharmacy role types
+  if (roleTypes && roleTypes.length > 0) {
+    if (!roleType || !roleTypes.includes(roleType)) {
+      return hideOnDenied ? null : <>{fallback}</>;
+    }
   }
 
   // Check single permission
