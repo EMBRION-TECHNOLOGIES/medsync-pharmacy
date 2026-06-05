@@ -219,14 +219,14 @@ export const useLogout = () => {
       queryClient.clear();
       authService.clearTokens();
       clearAllStores();
-      router.push('/login');
+      router.replace('/login');
     },
     onError: () => {
       // Even if logout API fails, clear local state
       queryClient.clear();
       authService.clearTokens();
       clearAllStores();
-      router.push('/login');
+      router.replace('/login');
     },
   });
 };

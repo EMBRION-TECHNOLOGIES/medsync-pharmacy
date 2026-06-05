@@ -150,3 +150,18 @@
     color: transparent;
   }
 }
+
+/* Sonner overrides — library defaults make descriptions too faint */
+[data-sonner-toast] .sonner-toast-title,
+[data-sonner-toast] [data-title] {
+  color: oklch(0.145 0 0) !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+
+[data-sonner-toast] .sonner-toast-description,
+[data-sonner-toast] [data-description] {
+  color: oklch(0.25 0 0) !important;
+  font-weight: 500 !important;
+  opacity: 1 !important;
+}

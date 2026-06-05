@@ -92,10 +92,10 @@ export default function ProtectedLayout({
     });
   }
 
-  // Redirect unauthenticated users
+  // Redirect unauthenticated users (logout, expired session, etc.)
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -204,13 +204,9 @@ export default function ProtectedLayout({
   }
 
   if (!isAuthenticated) {
-    console.error('🔴 [AUTH DEBUG] User not authenticated - returning null (NO REDIRECT)');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-red-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Not Authenticated</h1>
-          <p className="text-gray-600">Redirect disabled for debugging. Check console for details.</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
       </div>
     );
   }
